@@ -12,20 +12,15 @@
     </head>
 
     <script>
-    // Đợi cho đến khi bundle.js đã khởi tạo xong
     window.addEventListener('DOMContentLoaded', function () {
-        // Kiểm tra nếu đối tượng viewer đã tồn tại (được khởi tạo trong bundle.js)
         if (window.app && typeof window.app.loadModel === 'function') {
-            // Đường dẫn đến file glTF mặc định
-            const defaultModelUrl = 'model/Card Dispenser machine.glb';
-
-            // Gọi hàm loadModel từ app
-            window.app.loadModel(defaultModelUrl);
+            const modelUrl = 'https://drive.usercontent.google.com/download?id=1DAjeeP0LTxFPbZfPUqvjKU3sNhlRLL1m&export=download';
+            window.app.loadModel(modelUrl);
         } else {
             console.error('Viewer chưa sẵn sàng hoặc không có phương thức loadModel.');
         }
     });
-    </script>
+</script>
     
     <body>
         <div id="main">

@@ -72,53 +72,103 @@
 
     <!-- Script chính của ứng dụng Clay Viewer -->
     <script src="bundle.js"></script>
-
-    <!-- Script để load model mặc định -->
+    
+    <!-- Script để mô phỏng kéo thả model mặc định -->
     <script>
         (function() {
-            // URL tới file GLB mặc định của bạn
-            const defaultModelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model.glb';
-            const checkInterval = 100; // Thời gian kiểm tra lại (ms)
-            const maxWaitTime = 15000; // Thời gian chờ tối đa (ms) - ví dụ 15 giây
+            const modelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model.glb';
+            // Phần tử mục tiêu cho sự kiện drop (có thể là 'tip', 'viewport', hoặc document.body)
+            const dropTargetSelector = '#tip';
+            const checkInterval = 200; // Tăng thời gian kiểm tra
+            const maxWaitTime = 20000; // Tăng thời gian chờ tối đa
             let timeWaited = 0;
 
-            console.log('Chờ Clay Viewer khởi tạo...');
+            console.log('Chờ Clay Viewer và DOM sẵn sàng để mô phỏng drop...');
 
-            const intervalId = setInterval(() => {
-                // Kiểm tra xem đối tượng 'app' và phương thức 'loadModel' đã tồn tại chưa
-                // Giả định rằng 'bundle.js' sẽ tạo ra một đối tượng toàn cục tên là 'app'
-                // và đối tượng này có phương thức 'loadModel' để tải model từ URL.
-                // Tên 'app' và 'loadModel' có thể cần thay đổi tùy thuộc vào cách 'bundle.js' được viết.
-                if (window.app && typeof window.app.loadModel === 'function') {
-                    clearInterval(intervalId); // Dừng việc kiểm tra lặp lại
-                    console.log('Clay Viewer đã sẵn sàng. Đang tải model mặc định:', defaultModelURL);
-                    try {
-                        window.app.loadModel(defaultModelURL);
-                        console.log('Yêu cầu tải model đã được gửi.');
-                        // Ẩn thông báo chờ nếu có (ví dụ: #tip)
-                        const tipElement = document.getElementById('tip');
+            function simulateDrop(targetElement, file) {
+                if (!targetElement) {
+                    console.error('Không tìm thấy phần tử đích để drop:', dropTargetSelector);
+                    alert('Không tìm thấy khu vực để tải mô hình.');
+                    return;
+                }
+
+                console.log('Đang mô phỏng drop file:', file.name, 'lên', targetElement);
+
+                try {
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(file);
+                    dataTransfer.files = [file]; // Một số trình duyệt/thư viện cần cả cái này
+
+                    // --- Tạo và gửi các sự kiện liên quan ---
+                    // Một số viewer cần dragenter/dragover trước drop
+                    const dragEnterEvent = new DragEvent('dragenter', {
+                        bubbles: true, cancelable: true, dataTransfer: dataTransfer
+                    });
+                    targetElement.dispatchEvent(dragEnterEvent);
+
+                    const dragOverEvent = new DragEvent('dragover', {
+                        bubbles: true, cancelable: true, dataTransfer: dataTransfer
+                    });
+                    targetElement.dispatchEvent(dragOverEvent);
+
+                    // Sự kiện drop chính
+                    const dropEvent = new DragEvent('drop', {
+                        bubbles: true, cancelable: true, dataTransfer: dataTransfer
+                    });
+                    targetElement.dispatchEvent(dropEvent);
+
+                    console.log('Sự kiện drop đã được gửi.');
+                    // Ẩn/thay đổi tip nếu cần
+                    const tipElement = document.getElementById('tip');
                         if (tipElement) {
-                           // tipElement.style.display = 'none'; // Hoặc thay đổi nội dung
-                           tipElement.innerHTML = 'Đang tải mô hình 3D...'; // Thông báo rõ hơn
+                           tipElement.innerHTML = 'Đang tải mô hình 3D...';
                         }
-                    } catch (error) {
-                        console.error('Lỗi khi gọi window.app.loadModel:', error);
-                        alert('Đã xảy ra lỗi khi cố gắng tải model mặc định.');
+
+                } catch (error) {
+                    console.error('Lỗi khi mô phỏng sự kiện drop:', error);
+                    alert('Đã xảy ra lỗi khi cố gắng tải mô hình bằng cách mô phỏng.');
+                }
+            }
+
+            async function fetchAndDropModel() {
+                try {
+                    console.log('Đang tải dữ liệu model từ:', modelURL);
+                    const response = await fetch(modelURL);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
+                    const blob = await response.blob(); // Lấy dưới dạng Blob để dễ tạo File
+                    const file = new File([blob], 'Default_model.glb', { type: 'model/gltf-binary' });
+                    console.log('Dữ liệu model đã tải xong. Kích thước:', file.size);
+
+                    const targetElement = document.querySelector(dropTargetSelector);
+                    simulateDrop(targetElement, file);
+
+                } catch (error) {
+                    console.error('Lỗi khi tải hoặc tạo file GLB:', error);
+                    alert(`Không thể tải file GLB mặc định từ URL: ${error.message}`);
+                }
+            }
+
+            // Chờ cho phần tử đích xuất hiện trong DOM
+            const intervalId = setInterval(() => {
+                const targetElement = document.querySelector(dropTargetSelector);
+                // Chờ cả target element và có vẻ như viewer đã sẵn sàng (ví dụ: tip hiển thị)
+                if (targetElement && window.getComputedStyle(targetElement).display !== 'none') {
+                    clearInterval(intervalId);
+                    console.log('Phần tử đích đã sẵn sàng.');
+                    fetchAndDropModel();
                 } else {
-                    // console.log('Chưa sẵn sàng, đang chờ...'); // Bỏ comment nếu muốn xem log chi tiết
                     timeWaited += checkInterval;
                     if (timeWaited >= maxWaitTime) {
                         clearInterval(intervalId);
-                        console.error(`Clay Viewer không khởi tạo hoặc không có hàm loadModel sau ${maxWaitTime / 1000} giây.`);
-                        alert('Không thể khởi tạo trình xem mô hình hoặc tải mô hình mặc định. Vui lòng thử tải lại trang.');
+                        console.error(`Không tìm thấy hoặc phần tử đích (${dropTargetSelector}) không sẵn sàng sau ${maxWaitTime / 1000} giây.`);
+                        alert('Không thể tự động tải mô hình. Vui lòng kéo thả file thủ công.');
                     }
                 }
             }, checkInterval);
 
-            // Đảm bảo script chạy sau khi DOM đã được tải cơ bản,
-            // nhưng việc chờ `window.app` sẽ xử lý việc `bundle.js` load xong hay chưa.
-        })(); // IIFE - Immediately Invoked Function Expression để tránh làm ô nhiễm scope toàn cục
+        })(); // IIFE
     </script>
 
 </body>

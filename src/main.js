@@ -13,13 +13,14 @@ import openURL from 'vendor/openURL';
 var config = getDefaultSceneConfig();
 var materialConfig = getDefaultMaterialConfig();
 
-var viewer;
+var viewer; // Biến lưu trữ instance của viewer
 
 var controlKit = new ControlKit({
     loadAndSave: false,
     useExternalStyle: true
 });
 
+// --- CÁC HÀM UPDATE (Giữ nguyên) ---
 function updateLight() {
     ['mainLight', 'secondaryLight', 'tertiaryLight'].forEach(function (lightType) {
         config[lightType].alpha = config[lightType].$padAngle[1] * 90;
@@ -121,6 +122,7 @@ function hideTip() {
 }
 
 function createViewer() {
+    // Gán instance vào biến 'viewer' ở scope ngoài
     viewer = new ClayViewer(document.getElementById('viewport'), config);
     viewer.enablePicking();
     viewer.setCameraControl(config.viewControl);
@@ -196,20 +198,24 @@ function hideBackgroundProgress () {
     backgroundProgressEl.style.display = 'none';
 }
 
+// --- BIẾN KIỂM SOÁT TẢI MODEL MẶC ĐỊNH ---
+var shouldLoadDefaultModel = true; // Mặc định là cần tải
+
 function init() {
     hideLoading();
-
 
     document.getElementById('toolbar').style.display = 'block';
     document.getElementById('reset').addEventListener('click', reset);
     document.getElementById('download').addEventListener('click', download);
 
-    createViewer();
+    createViewer(); // Khởi tạo viewer và gán vào biến 'viewer'
 
-    ///////////// Drag and drop
+    ///////////// Thiết lập Drag and drop /////////////
     FileAPI.event.dnd(document.getElementById('main'), function (over) {
-
+        // Handle hover state if needed
     }, function (files) {
+        // --- NGĂN TẢI MODEL MẶC ĐỊNH KHI USER THẢ FILE ---
+        shouldLoadDefaultModel = false;
 
         showLoading('Loading model');
         timeline.hideTimeline();
@@ -231,6 +237,8 @@ function init() {
                 updateAll();
                 controlKit.update();
             }
+
+            // --- TẢI MODEL USER THẢ VÀO ---
             viewer.loadModel(glTF, {
                 files: filesMap,
                 buffers: buffers,
@@ -239,8 +247,7 @@ function init() {
                 upAxis: config.zUpToYUp ? 'z' : 'y',
                 includeTexture: !haveViewerConfig
             }).on('ready', function () {
-
-                hideTip();
+                hideTip(); // Ẩn tip sau khi tải xong
                 hideLoading();
 
                 if (haveViewerConfig) {
@@ -253,7 +260,6 @@ function init() {
                         viewer.setMaterial(matConfig.name, matConfig);
                     });
                 }
-
                 setTimeout(function () {
                     showSaveTip();
                     env.AUTO_SAVE && project.saveModelFiles(files).then(hideBackgroundProgress).catch(hideBackgroundProgress);
@@ -264,30 +270,55 @@ function init() {
                 hideLoading();
                 swal('Model load error');
             });
+            // ----------------------------------
 
             pbrRoughnessMetallicPanel.disable();
             pbrSpecularGlossinessPanel.disable();
 
         }).catch(function (err) {
-
             hideLoading();
             if (!viewer.getModelRoot()) {
                 showTip();
             }
             timeline.updateAnimationUI(viewer);
-
             console.log(err);
             swal(err.toString());
         });
     });
 
-
     initUI();
+
+    // --- TẢI MODEL MẶC ĐỊNH (NẾU CẦN THIẾT) ---
+    // Phải được gọi sau khi viewer đã chắc chắn được tạo
+    if (shouldLoadDefaultModel && viewer && typeof viewer.loadModel === 'function') {
+        const defaultModelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model.glb';
+        console.log('Attempting to load default model:', defaultModelURL);
+        showLoading('Đang tải mô hình mặc định...'); // Hiện loading
+        viewer.loadModel(defaultModelURL)
+            .on('ready', function() {
+                console.log('Default model loaded successfully.');
+                hideTip(); // Ẩn tip "Drag file..."
+                hideLoading(); // Ẩn loading indicator
+                timeline.updateAnimationUI(viewer); // Cập nhật UI timeline nếu model có animation
+            })
+            .on('loadmodel', afterLoadModel)
+            .on('error', function(err) {
+                console.error('Error loading default model:', err);
+                hideLoading();
+                showTip(); // Hiện lại tip nếu tải lỗi
+                swal('Không thể tải mô hình mặc định.');
+            });
+    } else if (shouldLoadDefaultModel) {
+         console.error('Viewer instance not available or loadModel function missing when trying to load default model.');
+         showTip(); // Hiển thị tip nếu không thể load default
+    }
+    // -------------------------------------------
 
     inited = true;
 }
 
 function initUI() {
+    // --- CẤU HÌNH UI (Giữ nguyên) ---
     scenePanel = controlKit.addPanel({ label: 'Settings', width: 250 });
 
     scenePanel.addGroup({ label: 'Global' })
@@ -431,6 +462,30 @@ function reset() {
 
         timeline.updateAnimationUI(viewer);
         hideBackgroundProgress();
+
+        // --- KHI RESET, CŨNG CẦN TẢI LẠI MODEL MẶC ĐỊNH ---
+        shouldLoadDefaultModel = true; // Reset lại biến cờ
+        if (shouldLoadDefaultModel && viewer && typeof viewer.loadModel === 'function') {
+             const defaultModelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model.glb';
+             console.log('Resetting and loading default model:', defaultModelURL);
+             showLoading('Đang tải mô hình mặc định...');
+             viewer.loadModel(defaultModelURL)
+                 .on('ready', function() {
+                     console.log('Default model loaded successfully after reset.');
+                     hideTip();
+                     hideLoading();
+                     timeline.updateAnimationUI(viewer);
+                 })
+                 .on('loadmodel', afterLoadModel)
+                 .on('error', function(err) {
+                     console.error('Error loading default model after reset:', err);
+                     hideLoading();
+                     showTip();
+                     swal('Không thể tải mô hình mặc định sau khi reset.');
+                 });
+        }
+        // ------------------------------------------------------
+
     }).catch(function () {});
 }
 
@@ -457,33 +512,41 @@ function afterLoadModel() {
 var filesMapInverse;
 var inited = false;
 
+// --- XỬ LÝ KHỞI TẠO BAN ĐẦU ---
 project.init(function (glTF, filesMap, loadedSceneCfg) {
 
     if (loadedSceneCfg) {
         zrUtil.merge(config, loadedSceneCfg, true);
     }
     if (inited) {
-        return;
+         return;
     }
 
-    init();
+    // --- NẾU CÓ MODEL TỪ CACHE, KHÔNG TẢI DEFAULT ---
+    if (glTF) {
+        shouldLoadDefaultModel = false;
+        console.log('Model found in project cache. Skipping default model load.');
+    }
+    // ---------------------------------------------
 
+    init(); // Gọi hàm init chính
+
+    // --- XỬ LÝ MODEL TỪ CACHE (SAU KHI init ĐÃ CHẠY) ---
     if (glTF) {
         filesMapInverse = {};
         for (var name in filesMap) {
             filesMapInverse[filesMap[name]] = name;
         }
+        showLoading('Loading model from cache...'); // Hiển thị loading
         viewer.loadModel(glTF, {
             files: filesMap,
             textureFlipY: config.textureFlipY,
             upAxis: config.zUpToYUp ? 'z' : 'y',
             doubleSided: true,
-            // Not load texture, setMaterial will do it.
-            includeTexture: false
+            includeTexture: false // Assume textures are loaded via material config
         }).on('ready', function () {
             if (loadedSceneCfg && loadedSceneCfg.materials) {
                 loadedSceneCfg.materials.forEach(function (matConfig) {
-                    // From file name to object URL
                     for (var key in matConfig) {
                         if (filesMap[matConfig[key]]) {
                             matConfig[key] = filesMap[matConfig[key]];
@@ -492,26 +555,35 @@ project.init(function (glTF, filesMap, loadedSceneCfg) {
                     viewer.setMaterial(matConfig.name, matConfig);
                 });
             }
+            hideTip(); // Ẩn tip
+            hideLoading(); // Ẩn loading
+            console.log('Model loaded from cache.');
+            timeline.updateAnimationUI(viewer);
         })
         .on('loadmodel', afterLoadModel)
         .on('error', function () {
-            showTip();
-            swal('Model load error');
+            hideLoading();
+            showTip(); // Hiện lại tip nếu lỗi
+            swal('Model load error from cache');
         });
-    }
-    else {
+    } else if (!shouldLoadDefaultModel) {
+        // Không có cache, cũng không load default (do user thả file chẳng hạn)
         showTip();
     }
+    // ---------------------------------------------
 });
 
+// Xử lý timeout
 setTimeout(function () {
     if (inited) {
         return;
     }
-    console.warn('Init time out');
-    init();
+    console.warn('Init time out. Initializing viewer...');
+    init(); // Gọi init() để đảm bảo viewer được tạo và thử tải model mặc định
 }, 5000);
 
+
+// --- LƯU TRẠNG THÁI TỰ ĐỘNG (Giữ nguyên) ---
 setInterval(function () {
     if (viewer && !document.hidden) {
         var materialsMap = {};

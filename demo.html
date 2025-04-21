@@ -72,44 +72,6 @@
 
     <!-- Script chính của ứng dụng Clay Viewer -->
     <script src="bundle.js"></script>
-    
-<script>
-    (function() {
-        const defaultModelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model.glb';
-        const checkInterval = 100;
-        const maxWaitTime = 15000;
-        let timeWaited = 0;
-
-        console.log('Chờ Clay Viewer (clayViewerApp) khởi tạo...');
-
-        const intervalId = setInterval(() => {
-            // Kiểm tra tên biến toàn cục bạn đã đặt trong bundle.js
-            if (window.clayViewerApp && typeof window.clayViewerApp.loadModel === 'function') {
-                clearInterval(intervalId);
-                console.log('Clay Viewer đã sẵn sàng. Đang tải model mặc định:', defaultModelURL);
-                try {
-                    // Gọi hàm loadModel trên instance viewer
-                    window.clayViewerApp.loadModel(defaultModelURL);
-                    console.log('Yêu cầu tải model đã được gửi.');
-                    const tipElement = document.getElementById('tip');
-                    if (tipElement) {
-                       tipElement.innerHTML = 'Đang tải mô hình 3D...';
-                    }
-                } catch (error) {
-                    console.error('Lỗi khi gọi window.clayViewerApp.loadModel:', error);
-                    alert('Đã xảy ra lỗi khi cố gắng tải model mặc định.');
-                }
-            } else {
-                timeWaited += checkInterval;
-                if (timeWaited >= maxWaitTime) {
-                    clearInterval(intervalId);
-                    console.error(`Clay Viewer không khởi tạo hoặc không có hàm loadModel sau ${maxWaitTime / 1000} giây.`);
-                    alert('Không thể khởi tạo trình xem mô hình hoặc tải mô hình mặc định. Vui lòng thử tải lại trang.');
-                }
-            }
-        }, checkInterval);
-    })();
-</script>
 
 </body>
 </html>

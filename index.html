@@ -1,0 +1,94 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script src="lib/pace.min.js"></script>
+        <title>Clay Viewer</title>
+        <link rel="stylesheet" href="css/controlKit.css">
+        <link rel="stylesheet" href="css/main.css">
+        <link rel="stylesheet" href="css/iconfont/iconfont.css">
+        <link rel="stylesheet" href="lib/ion.rangeSlider/css/ion.rangeSlider.css">
+        <link rel="stylesheet" href="lib/ion.rangeSlider/css/ion.rangeSlider.skinFlat.css">
+    </head>
+
+    <script>
+        // Đảm bảo model chỉ load khi viewer đã khởi tạo xong
+        function waitForViewerAndLoadModel(url) {
+            const checkInterval = setInterval(() => {
+                if (window.app && typeof window.app.loadModel === 'function') {
+                    clearInterval(checkInterval);
+                    window.app.loadModel(url);
+                    console.log('Model đã được load:', url);
+                }
+            }, 100);
+        }
+    
+        // URL tới file GLB (đảm bảo đây là link tải trực tiếp!)
+        const modelURL = 'https://github.com/KhronosGroup/glTF-Sample-Models/blob/main/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb';
+    
+        // Gọi hàm khi DOM đã sẵn sàng
+        document.addEventListener('DOMContentLoaded', () => {
+            waitForViewerAndLoadModel(modelURL);
+        });
+    </script>
+    
+    
+    <body>
+
+        <header>
+            <nav>
+                <ul style="list-style: none; display: flex; justify-content: space-around; padding: 10px; background-color: #f4f4f4; margin: 0;">
+                    <li><a href="#" style="text-decoration: none; font-weight: bold;">Trang chủ</a></li>
+                    <li><a href="#about" style="text-decoration: none;">About</a></li>
+                    <li><a href="#features" style="text-decoration: none;">Tính năng</a></li>
+                    <li><a href="#contact" style="text-decoration: none;">Liên hệ</a></li>
+                </ul>
+            </nav>
+        </header>
+        
+        <div id="main">
+            <div id="viewport"></div>
+            <div id="tip">
+            </div>
+            <div id="timeline">
+                <div id="timeline-range-wrap">
+                    <div id="timeline-range">
+                        <input>
+                    </div>
+                </div>
+                <div id="timeline-progress-wrap">
+                    <div id="timeline-progress">
+                        <input>
+                    </div>
+                    <div id="timeline-pause-resume" class="iconfont icon-resume"></div>
+                </div>
+            </div>
+            <div id="background-progress">
+                <div id="background-progress-text"></div>
+                <div class="spinner"></div>
+            </div>
+        </div>
+        <div id="loading">
+            <div class="sk-folding-cube">
+                <div class="sk-cube1 sk-cube"></div>
+                <div class="sk-cube2 sk-cube"></div>
+                <div class="sk-cube4 sk-cube"></div>
+                <div class="sk-cube3 sk-cube"></div>
+            </div>
+            <div id="loading-text">LOADING</div>
+        </div>
+        <div id="toolbar">
+            <span class="iconfont icon-download" id="download" title="Download"></span>
+            <span class="iconfont icon-reset" id="reset" title="Reset"></span>
+        </div>
+        <script src="lib/controlKit.js"></script>
+        <script src="lib/FileAPI.js"></script>
+        <script src="lib/FileSaver.js"></script>
+        <script src="lib/sweetalert.min.js"></script>
+        <script src="lib/jszip.min.js"></script>
+        <script src="lib/jquery.min.js"></script>
+        <script src="lib/ion.rangeSlider.js"></script>
+        <script src="lib/browserfs.min.js"></script>
+        <script src="bundle.js"></script>
+    </body>
+    </html>

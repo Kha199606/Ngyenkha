@@ -1,0 +1,115 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="lib/pace.min.js"></script>
+    <title>Kha Viewer</title>
+    <link rel="stylesheet" href="css/controlKit.css">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/iconfont/iconfont.css">
+    <link rel="stylesheet" href="lib/ion.rangeSlider/css/ion.rangeSlider.css">
+    <link rel="stylesheet" href="lib/ion.rangeSlider/css/ion.rangeSlider.skinFlat.css">
+</head>
+
+<body>
+
+    <header>
+        <nav>
+            <ul style="list-style: none; display: flex; justify-content: space-around; padding: 10px; background-color: #f4f4f4; margin: 0;">
+                <li><a href="#" style="text-decoration: none; font-weight: bold;">Trang chủ</a></li>
+                <li><a href="#about" style="text-decoration: none;">About</a></li>
+                <li><a href="#features" style="text-decoration: none;">Tính năng</a></li>
+                <li><a href="#contact" style="text-decoration: none;">Liên hệ</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div id="main">
+        <div id="viewport"></div>
+        <div id="tip">
+        </div>
+        <div id="timeline">
+            <div id="timeline-range-wrap">
+                <div id="timeline-range">
+                    <input>
+                </div>
+            </div>
+            <div id="timeline-progress-wrap">
+                <div id="timeline-progress">
+                    <input>
+                </div>
+                <div id="timeline-pause-resume" class="iconfont icon-resume"></div>
+            </div>
+        </div>
+        <div id="background-progress">
+            <div id="background-progress-text"></div>
+            <div class="spinner"></div>
+        </div>
+    </div>
+    <div id="loading">
+        <div class="sk-folding-cube">
+            <div class="sk-cube1 sk-cube"></div>
+            <div class="sk-cube2 sk-cube"></div>
+            <div class="sk-cube4 sk-cube"></div>
+            <div class="sk-cube3 sk-cube"></div>
+        </div>
+        <div id="loading-text">LOADING</div>
+    </div>
+    <div id="toolbar">
+        <span class="iconfont icon-download" id="download" title="Download"></span>
+        <span class="iconfont icon-reset" id="reset" title="Reset"></span>
+    </div>
+
+    <!-- Các thư viện JS -->
+    <script src="lib/controlKit.js"></script>
+    <script src="lib/FileAPI.js"></script>
+    <script src="lib/FileSaver.js"></script>
+    <script src="lib/sweetalert.min.js"></script>
+    <script src="lib/jszip.min.js"></script>
+    <script src="lib/jquery.min.js"></script>
+    <script src="lib/ion.rangeSlider.js"></script>
+    <script src="lib/browserfs.min.js"></script>
+
+    <!-- Script chính của ứng dụng Clay Viewer -->
+    <script src="bundle.js"></script>
+    
+<script>
+    (function() {
+        const defaultModelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model.glb';
+        const checkInterval = 100;
+        const maxWaitTime = 15000;
+        let timeWaited = 0;
+
+        console.log('Chờ Clay Viewer (clayViewerApp) khởi tạo...');
+
+        const intervalId = setInterval(() => {
+            // Kiểm tra tên biến toàn cục bạn đã đặt trong bundle.js
+            if (window.clayViewerApp && typeof window.clayViewerApp.loadModel === 'function') {
+                clearInterval(intervalId);
+                console.log('Clay Viewer đã sẵn sàng. Đang tải model mặc định:', defaultModelURL);
+                try {
+                    // Gọi hàm loadModel trên instance viewer
+                    window.clayViewerApp.loadModel(defaultModelURL);
+                    console.log('Yêu cầu tải model đã được gửi.');
+                    const tipElement = document.getElementById('tip');
+                    if (tipElement) {
+                       tipElement.innerHTML = 'Đang tải mô hình 3D...';
+                    }
+                } catch (error) {
+                    console.error('Lỗi khi gọi window.clayViewerApp.loadModel:', error);
+                    alert('Đã xảy ra lỗi khi cố gắng tải model mặc định.');
+                }
+            } else {
+                timeWaited += checkInterval;
+                if (timeWaited >= maxWaitTime) {
+                    clearInterval(intervalId);
+                    console.error(`Clay Viewer không khởi tạo hoặc không có hàm loadModel sau ${maxWaitTime / 1000} giây.`);
+                    alert('Không thể khởi tạo trình xem mô hình hoặc tải mô hình mặc định. Vui lòng thử tải lại trang.');
+                }
+            }
+        }, checkInterval);
+    })();
+</script>
+
+</body>
+</html>

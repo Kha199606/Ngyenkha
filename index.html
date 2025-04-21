@@ -11,26 +11,26 @@
         <link rel="stylesheet" href="lib/ion.rangeSlider/css/ion.rangeSlider.skinFlat.css">
     </head>
 
-    <script>
-        // Đảm bảo model chỉ load khi viewer đã khởi tạo xong
-        function waitForViewerAndLoadModel(url) {
-            const checkInterval = setInterval(() => {
-                if (window.app && typeof window.app.loadModel === 'function') {
-                    clearInterval(checkInterval);
-                    window.app.loadModel(url);
-                    console.log('Model đã được load:', url);
-                }
-            }, 100);
-        }
+<script>
+    // Đảm bảo model chỉ load khi viewer đã khởi tạo xong
+    function waitForViewerAndLoadModel(url) {
+        const checkInterval = setInterval(() => {
+            if (window.app && typeof window.app.loadModel === 'function') {
+                clearInterval(checkInterval);
+                window.app.loadModel(url);
+                console.log('Model đã được load:', url);
+            }
+        }, 100);
+    }
+
+    // URL tới file GLB nằm trong folder "model"
+    const modelURL = './model/Default_model.glb';
     
-        // URL tới file GLB (đảm bảo đây là link tải trực tiếp!)
-        const modelURL = 'https://github.com/KhronosGroup/glTF-Sample-Models/blob/main/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb';
-    
-        // Gọi hàm khi DOM đã sẵn sàng
-        document.addEventListener('DOMContentLoaded', () => {
-            waitForViewerAndLoadModel(modelURL);
-        });
-    </script>
+    // Gọi hàm khi DOM đã sẵn sàng
+    document.addEventListener('DOMContentLoaded', () => {
+        waitForViewerAndLoadModel(modelURL);
+    });
+</script>
     
     
     <body>

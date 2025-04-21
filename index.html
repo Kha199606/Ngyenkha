@@ -78,14 +78,17 @@
 <script>
     // Đảm bảo model chỉ load khi viewer đã khởi tạo xong
     function waitForViewerAndLoadModel(url) {
-        const checkInterval = setInterval(() => {
-            if (window.app && typeof window.app.loadModel === 'function') {
-                clearInterval(checkInterval);
-                window.app.loadModel(url);
-                console.log('Model đã được load:', url);
-            }
-        }, 100);
-    }
+    const checkInterval = setInterval(() => {
+        // Kiểm tra kỹ hơn nếu viewer đã được khởi tạo
+        if (window.app && window.app.loadModel && typeof window.app.loadModel === 'function') {
+            clearInterval(checkInterval);
+            window.app.loadModel(url);
+            console.log('Model đã được load:', url);
+        } else {
+            console.log('Đang chờ viewer khởi tạo...');
+        }
+    }, 100);
+}
 
     // URL tới file GLB nằm trong folder "model"
     const modelURL = 'model/Default_model.glb';

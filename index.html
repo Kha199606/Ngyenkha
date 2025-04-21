@@ -71,33 +71,30 @@
         <script src="lib/browserfs.min.js"></script>
         <script src="bundle.js"></script>
 
-        
-    </body>
-
-    
+            
 <script>
     // Đảm bảo model chỉ load khi viewer đã khởi tạo xong
     function waitForViewerAndLoadModel(url) {
-    const checkInterval = setInterval(() => {
-        // Kiểm tra kỹ hơn nếu viewer đã được khởi tạo
-        if (window.app && window.app.loadModel && typeof window.app.loadModel === 'function') {
-            clearInterval(checkInterval);
-            window.app.loadModel(url);
-            console.log('Model đã được load:', url);
-        } else {
-            console.log('Đang chờ viewer khởi tạo...');
-        }
-    }, 100);
-}
+        const checkInterval = setInterval(() => {
+            if (window.app && typeof window.app.loadModel === 'function') {
+                clearInterval(checkInterval);
+                window.app.loadModel(url);
+                console.log('Model đã được load:', url);
+            }
+        }, 100);
+    }
 
-    // URL tới file GLB nằm trong folder "model"
-    const modelURL = 'model/Default_model.glb';
+    // URL tới file GLB
+    const modelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model.glb';
     
     // Gọi hàm khi DOM đã sẵn sàng
     document.addEventListener('DOMContentLoaded', () => {
         waitForViewerAndLoadModel(modelURL);
     });
 </script>
+    </body>
+
+
     
     
     </html>

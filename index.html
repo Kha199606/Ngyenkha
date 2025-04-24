@@ -138,7 +138,7 @@
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     const blob = await response.blob(); // Lấy dưới dạng Blob để dễ tạo File
-                    const file = new File([blob], 'Default_model.glb', { type: 'model/gltf-binary' });
+                    const file = new File([blob], 'Default_model_v2.glb', { type: 'model/gltf-binary' });
                     console.log('Dữ liệu model đã tải xong. Kích thước:', file.size);
 
                     const targetElement = document.querySelector(dropTargetSelector);

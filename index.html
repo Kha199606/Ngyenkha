@@ -18,6 +18,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/css/ion.rangeSlider.min.css"/>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/js/ion.rangeSlider.min.js"></script>
     <!-- Import Map -->
+	<script src="js/controlKit.js"></script>
+	<link rel="stylesheet" href="css/controlKit.css"> <!-- Adjust path if needed -->
+	<script src="js/FileAPI.js"></script>
+	<!-- Import Map -->
     <script type="importmap">
         {
             "imports": {
@@ -27,69 +31,13 @@
             }
         }
     </script>
-	
-	  <style>
-		#gui-container .lil-gui .c {
-		  padding: 10px;
-		}
 
-		#gui-container .lil-gui button {
-		  background-color: #444;
-		  color: white;
-		  border: none;
-		  padding: 6px 12px;
-		  font-size: 14px;
-		  cursor: pointer;
-		  border-radius: 4px;
-		}
-
-		#gui-container .lil-gui button:hover {
-		  background-color: #666;
-		}
-		
-		/* Định dạng lại các phần tử trong gui-container */
-/* Định dạng lại các phần tử trong gui-container */
-#gui-container .lil-gui {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Định dạng cho div.widget chứa hình ảnh */
-#gui-container .map-control {
-  display: flex;
-  align-items: center;  /* Căn chỉnh theo chiều dọc */
-  justify-content: flex-start;  /* Căn chỉnh theo chiều ngang */
-  gap: 10px; /* Khoảng cách giữa các phần tử */
-}
-
-/* Định dạng cho phần tử widget chứa hình ảnh */
-#gui-container .map-control .widget {
-  display: flex;
-  align-items: center;
-}
-
-/* Định dạng hình ảnh trong widget */
-#gui-container .map-control .widget img {
-  max-width: 50px;  /* Giới hạn chiều rộng hình ảnh */
-  max-height: 50px; /* Giới hạn chiều cao hình ảnh */
-  border-radius: 4px;  /* Bo góc hình ảnh */
-  margin-left: 10px;  /* Tạo khoảng cách giữa hình ảnh và các nút */
-}
-
-/* Điều chỉnh nút Upload và Clear */
-#gui-container .map-control button {
-  padding: 5px 10px;
-  font-size: 12px;
-}
-
-
-		</style>
 	
 	
 </head>
 <body>
     <div id="container"></div>
-	<div id="gui-container" style="position: fixed; top: 10px; left: 10px; z-index: 10;"></div>
+	<div id="gui-container" style="position: fixed; top: 0px; left: 10px; z-index: 10;"></div>
     <div id="timeline" style="display:none;">
         <div id="timeline-controls">
             <div id="timeline-range-wrap">

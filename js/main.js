@@ -2,7 +2,7 @@ import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/RGBELoader.js';
-import { updateSidebar } from './sidebar.js';
+import { updateSidebar, clearSidebar } from './sidebar.js'; // Adjust path if needed
 
 
 
@@ -95,29 +95,75 @@ function init() {
 }
 
 function onMouseMove(event) {
-    // Cập nhật vị trí chuột trong không gian 2D
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-
-    // Cập nhật raycaster từ camera và vị trí chuột
-    raycaster.setFromCamera(mouse, camera);
 }
 
+function onClick(event) {
+    // Update raycaster before checking intersections
+    raycaster.setFromCamera(mouse, camera);
 
-function onClick() {
-  // Kiểm tra sự giao cắt giữa raycaster và các đối tượng trong scene
-  if (scene.children && scene.children.length > 0) {
-    const intersects = raycaster.intersectObjects(scene.children, true);
-    if (intersects.length > 0) {
-      intersectedObject = intersects[0].object;
-      console.log('Đối tượng được chọn:', intersectedObject);
+    // Check for intersections
+    if (scene.children && scene.children.length > 0) {
+        const intersects = raycaster.intersectObjects(scene.children, true); // true for recursive
 
-      // Nếu là mesh và có material phù hợp thì cập nhật vào GUI
-      if (intersectedObject.isMesh && intersectedObject.material instanceof THREE.MeshStandardMaterial) {
-        updateSidebar(intersectedObject); // 🧠 Gọi hàm từ sidebar.js
-      }
+        if (intersects.length > 0) {
+            // Find the first visible Mesh ancestor
+            let intersectedMesh = null;
+            for (let i = 0; i < intersects.length; i++) {
+                let obj = intersects[i].object;
+                while (obj) {
+                    if (obj.isMesh && obj.visible) {
+                         intersectedMesh = obj;
+                         break; // Found the mesh
+                    }
+                     if (!obj.parent || obj === scene) break; // Stop if we reach scene or no parent
+                    obj = obj.parent;
+                 }
+                 if (intersectedMesh) break; // Exit outer loop if mesh found
+            }
+
+
+            if (intersectedMesh && intersectedMesh !== selectedObject) {
+                console.log('Object selected:', intersectedMesh.name, intersectedMesh);
+                selectedObject = intersectedMesh;
+
+                // Check if it has a suitable material before updating sidebar
+                if (selectedObject.material instanceof THREE.MeshStandardMaterial) {
+                    updateSidebar(selectedObject); // Call function from sidebar.js
+                } else {
+                    console.log('Selected object material is not MeshStandardMaterial:', selectedObject.material);
+                    clearSidebar(); // Clear sidebar if material is not suitable
+                    selectedObject = null; // Deselect if not suitable
+                }
+            } else if (intersectedMesh && intersectedMesh === selectedObject) {
+                 // Clicked the same object again, do nothing or maybe toggle something?
+                 console.log('Clicked the same object again.');
+            } else if (intersects.length > 0 && !intersectedMesh) {
+                 // Intersected something, but not a visible mesh (e.g., helper, line)
+                 console.log('Intersection with non-mesh object:', intersects[0].object);
+                 if (selectedObject) { // Deselect if something else was clicked
+                     console.log('Deselecting previous object.');
+                     clearSidebar();
+                     selectedObject = null;
+                 }
+            }
+
+        } else {
+            // Clicked on empty space (no intersections)
+            if (selectedObject) {
+                console.log('Clicked background, deselecting.');
+               // clearSidebar(); // Clear the sidebar
+                selectedObject = null;
+            }
+        }
+    } else {
+         // Scene has no children? Also clear selection
+         if (selectedObject) {
+           //  clearSidebar();
+             selectedObject = null;
+         }
     }
-  }
 }
 
 function setupTimelineControls() {
@@ -222,5 +268,8 @@ function onWindowResize() {
     if (rangeSliderInstance) rangeSliderInstance.update({});
     if (progressSliderInstance) progressSliderInstance.update({});
 }
-
+// Ensure click listener is added:
+window.addEventListener('click', onClick, false);
+// Keep mousemove listener
+window.addEventListener('mousemove', onMouseMove, false);
 init();

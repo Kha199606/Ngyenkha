@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ControlKit - Material Panel Example</title>
+    <meta charset="UTF-8">
+    <!-- Link tới CSS của ControlKit (sử dụng CDN) -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/gh/automat/controlkit.js@master/bin/controlKit.css">
+    <style>
+        /* Tùy chỉnh nhỏ để panel giống hơn */
+        body {
+            background-color: #ddd; /* Nền giống ảnh chụp màn hình */
+        }
+        /* ControlKit có thể cần điều chỉnh thêm CSS để khớp màu nền, font... */
+        .controlKit {
+             /* Có thể thêm CSS tùy chỉnh ở đây nếu cần */
+        }
+        .controlKit .panel .label {
+             /* Điều chỉnh font, màu chữ label nếu cần */
+        }
+         .controlKit .panel .input-string input {
+             /* Điều chỉnh ô text input nếu cần */
+         }
+         /* ... các tùy chỉnh khác ... */
+
+    </style>
+</head>
+<body>
+
+    <!-- Link tới JS của ControlKit (sử dụng CDN) -->
+    <script src="https://cdn.jsdelivr.net/gh/automat/controlkit.js@master/bin/controlKit.min.js"></script>
+
+    <script>
+        window.addEventListener('load', function() {
+
+            // 1. Tạo đối tượng chứa các giá trị thuộc tính
+            var materialProperties = {
+                name: 'RAL5008',
+                baseColor: [1.0, 1.0, 1.0], // ControlKit thường dùng mảng [R, G, B] (0-1) cho màu sắc
+                alpha: 1.0,
+                alphaCutoff: 0.0,
+                tiling: 1,
+                baseMap: 'none',
+                normalMap: 'none',
+                metalnessMap: 'none',
+                metalness: 0.0,
+                roughnessMap: 'none',
+                roughness: 0.587,
+                parallaxMap: 'none',
+                scale: 0.02,
+                emissionColor: [0.0, 0.0, 0.0], // Màu đen
+                emissionIntensity: 1.0,
+                emissiveMap: 'none',
+
+                // Định nghĩa khoảng giá trị cho các slider
+                alphaRange: [0.0, 1.0],
+                metalnessRange: [0.0, 1.0],
+                roughnessRange: [0.0, 1.0],
+                scaleRange: [0.0, 1.0] // Hoặc một khoảng nhỏ hơn phù hợp, ví dụ [0.0, 0.1]
+            };
+
+            // 2. Khởi tạo ControlKit
+            var controlKit = new ControlKit();
+
+            // 3. Tạo Panel chính
+            var panel = controlKit.addPanel({
+                label: 'Material - Metallic Roughness',
+                align: 'left', // Hoặc 'right'
+                fixed: false,  // Cho phép cuộn nếu panel quá dài
+                width: 320     // Điều chỉnh chiều rộng nếu cần
+            });
+
+            // 4. Thêm các controls vào panel
+            panel.addStringInput(materialProperties, 'name', { label: 'Name' });
+            panel.addColor(materialProperties, 'baseColor', { label: 'Base Color', colorMode: 'hex' }); // Hiển thị dạng hex
+            panel.addSlider(materialProperties, 'alpha', 'alphaRange', { label: 'Alpha', step: 0.01, dp: 2 }); // dp: số chữ số thập phân
+            panel.addNumberInput(materialProperties, 'alphaCutoff', { label: 'Alpha Cutoff', step: 0.01, dp: 2 });
+            panel.addNumberInput(materialProperties, 'tiling', { label: 'Tiling', step: 1 });
+
+            // Sử dụng StringInput cho các Map - cách đơn giản nhất trong ControlKit
+            panel.addStringInput(materialProperties, 'baseMap', { label: 'Base Map' });
+            panel.addStringInput(materialProperties, 'normalMap', { label: 'Normal/Bump ...' }); // Cắt bớt label
+            panel.addStringInput(materialProperties, 'metalnessMap', { label: 'Metalness Map' });
+            panel.addSlider(materialProperties, 'metalness', 'metalnessRange', { label: 'Metalness', step: 0.01, dp: 2 });
+            panel.addStringInput(materialProperties, 'roughnessMap', { label: 'Roughness Map' });
+            panel.addSlider(materialProperties, 'roughness', 'roughnessRange', { label: 'Roughness', step: 0.001, dp: 3 }); // dp=3 để hiển thị 0.587
+            panel.addStringInput(materialProperties, 'parallaxMap', { label: 'Parallax Occlus...' }); // Cắt bớt label
+            panel.addSlider(materialProperties, 'scale', 'scaleRange', { label: 'Scale', step: 0.001, dp: 2 }); // dp=2 để hiển thị 0.02
+            panel.addColor(materialProperties, 'emissionColor', { label: 'Emission', colorMode: 'hex' });
+            panel.addNumberInput(materialProperties, 'emissionIntensity', { label: 'Emission Intensity', step: 0.1 });
+            panel.addStringInput(materialProperties, 'emissiveMap', { label: 'Emissive Map' });
+
+        });
+    </script>
+
+</body>
+</html>

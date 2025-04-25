@@ -1,175 +1,112 @@
-<html>
+<!DOCTYPE html>
+<html lang="vi">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="lib/pace.min.js"></script>
-    <title>Kha Viewer</title>
-    <link rel="stylesheet" href="css/controlKit.css">
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/iconfont/iconfont.css">
-    <link rel="stylesheet" href="lib/ion.rangeSlider/css/ion.rangeSlider.css">
-    <link rel="stylesheet" href="lib/ion.rangeSlider/css/ion.rangeSlider.skinFlat.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Three.js - Timeline Sync</title>
+	<link rel="stylesheet" href="main.css"> <!-- Assuming main.css exists -->
+    <link rel="stylesheet" href="css/sidebar.css">
+	<script src="js/controlKit.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/lil-gui@0.18"></script>
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f0f0f0; }
+        canvas { display: block; }
+    </style>
+    <!-- Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/css/ion.rangeSlider.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/js/ion.rangeSlider.min.js"></script>
+    <!-- Import Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+
+            }
+        }
+    </script>
+	
+	  <style>
+		#gui-container .lil-gui .c {
+		  padding: 10px;
+		}
+
+		#gui-container .lil-gui button {
+		  background-color: #444;
+		  color: white;
+		  border: none;
+		  padding: 6px 12px;
+		  font-size: 14px;
+		  cursor: pointer;
+		  border-radius: 4px;
+		}
+
+		#gui-container .lil-gui button:hover {
+		  background-color: #666;
+		}
+		
+		/* Định dạng lại các phần tử trong gui-container */
+/* Định dạng lại các phần tử trong gui-container */
+#gui-container .lil-gui {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Định dạng cho div.widget chứa hình ảnh */
+#gui-container .map-control {
+  display: flex;
+  align-items: center;  /* Căn chỉnh theo chiều dọc */
+  justify-content: flex-start;  /* Căn chỉnh theo chiều ngang */
+  gap: 10px; /* Khoảng cách giữa các phần tử */
+}
+
+/* Định dạng cho phần tử widget chứa hình ảnh */
+#gui-container .map-control .widget {
+  display: flex;
+  align-items: center;
+}
+
+/* Định dạng hình ảnh trong widget */
+#gui-container .map-control .widget img {
+  max-width: 50px;  /* Giới hạn chiều rộng hình ảnh */
+  max-height: 50px; /* Giới hạn chiều cao hình ảnh */
+  border-radius: 4px;  /* Bo góc hình ảnh */
+  margin-left: 10px;  /* Tạo khoảng cách giữa hình ảnh và các nút */
+}
+
+/* Điều chỉnh nút Upload và Clear */
+#gui-container .map-control button {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+
+		</style>
+	
+	
 </head>
-
 <body>
-
-    <header>
-        <nav>
-            <ul style="list-style: none; display: flex; justify-content: space-around; padding: 10px; background-color: #f4f4f4; margin: 0;">
-                <li><a href="#" style="text-decoration: none; font-weight: bold;">Trang chủ</a></li>
-                <li><a href="/Ngyenkha/viewer" style="text-decoration: none;">Model Viewer</a></li>
-                <li><a href="#features" style="text-decoration: none;">Tính năng</a></li>
-                <li><a href="#contact" style="text-decoration: none;">Liên hệ</a></li>
-            </ul>
-        </nav>
-    </header>
-
-    <div id="main">
-        <div id="viewport"></div>
-        <div id="tip">
-        </div>
-        <div id="timeline">
+    <div id="container"></div>
+	<div id="gui-container" style="position: fixed; top: 10px; left: 10px; z-index: 10;"></div>
+    <div id="timeline" style="display:none;">
+        <div id="timeline-controls">
             <div id="timeline-range-wrap">
                 <div id="timeline-range">
-                    <input>
+                    <input type="text" id="timeline-range-input" name="timeline_range" value="" />
                 </div>
             </div>
             <div id="timeline-progress-wrap">
                 <div id="timeline-progress">
-                    <input>
+                    <input type="text" id="timeline-progress-input" name="timeline_progress" value="" />
                 </div>
-                <div id="timeline-pause-resume" class="iconfont icon-resume"></div>
+                <div id="timeline-pause-resume"><div class="play-icon"></div><div class="pause-icon"></div></div>
             </div>
         </div>
-        <div id="background-progress">
-            <div id="background-progress-text"></div>
-            <div class="spinner"></div>
-        </div>
     </div>
-    <div id="loading">
-        <div class="sk-folding-cube">
-            <div class="sk-cube1 sk-cube"></div>
-            <div class="sk-cube2 sk-cube"></div>
-            <div class="sk-cube4 sk-cube"></div>
-            <div class="sk-cube3 sk-cube"></div>
-        </div>
-        <div id="loading-text">LOADING</div>
-    </div>
-    <div id="toolbar">
-        <span class="iconfont icon-download" id="download" title="Download"></span>
-        <span class="iconfont icon-reset" id="reset" title="Reset"></span>
-    </div>
-
-    <!-- Các thư viện JS -->
-    <script src="lib/controlKit.js"></script>
-    <script src="lib/FileAPI.js"></script>
-    <script src="lib/FileSaver.js"></script>
-    <script src="lib/sweetalert.min.js"></script>
-    <script src="lib/jszip.min.js"></script>
-    <script src="lib/jquery.min.js"></script>
-    <script src="lib/ion.rangeSlider.js"></script>
-    <script src="lib/browserfs.min.js"></script>
-
-    <!-- Script chính của ứng dụng Clay Viewer -->
-    <script src="bundle.js"></script>
-    
-    <!-- Script để mô phỏng kéo thả model mặc định -->
-    <script>
-        (function() {
-            const modelURL = 'https://raw.githubusercontent.com/Kha199606/Ngyenkha/main/model/Default_model_v2.glb';
-            // Phần tử mục tiêu cho sự kiện drop (có thể là 'tip', 'viewport', hoặc document.body)
-            const dropTargetSelector = '#tip';
-            const checkInterval = 200; // Tăng thời gian kiểm tra
-            const maxWaitTime = 20000; // Tăng thời gian chờ tối đa
-            let timeWaited = 0;
-
-            console.log('Chờ Clay Viewer và DOM sẵn sàng để mô phỏng drop...');
-
-            function simulateDrop(targetElement, file) {
-                if (!targetElement) {
-                    console.error('Không tìm thấy phần tử đích để drop:', dropTargetSelector);
-                    alert('Không tìm thấy khu vực để tải mô hình.');
-                    return;
-                }
-
-                console.log('Đang mô phỏng drop file:', file.name, 'lên', targetElement);
-
-                try {
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    dataTransfer.files = [file]; // Một số trình duyệt/thư viện cần cả cái này
-
-                    // --- Tạo và gửi các sự kiện liên quan ---
-                    // Một số viewer cần dragenter/dragover trước drop
-                    const dragEnterEvent = new DragEvent('dragenter', {
-                        bubbles: true, cancelable: true, dataTransfer: dataTransfer
-                    });
-                    targetElement.dispatchEvent(dragEnterEvent);
-
-                    const dragOverEvent = new DragEvent('dragover', {
-                        bubbles: true, cancelable: true, dataTransfer: dataTransfer
-                    });
-                    targetElement.dispatchEvent(dragOverEvent);
-
-                    // Sự kiện drop chính
-                    const dropEvent = new DragEvent('drop', {
-                        bubbles: true, cancelable: true, dataTransfer: dataTransfer
-                    });
-                    targetElement.dispatchEvent(dropEvent);
-
-                    console.log('Sự kiện drop đã được gửi.');
-                    // Ẩn/thay đổi tip nếu cần
-                    const tipElement = document.getElementById('tip');
-                        if (tipElement) {
-                           tipElement.innerHTML = 'Đang tải mô hình 3D...';
-                        }
-
-                } catch (error) {
-                    console.error('Lỗi khi mô phỏng sự kiện drop:', error);
-                    alert('Đã xảy ra lỗi khi cố gắng tải mô hình bằng cách mô phỏng.');
-                }
-            }
-
-            async function fetchAndDropModel() {
-                try {
-                    console.log('Đang tải dữ liệu model từ:', modelURL);
-                    const response = await fetch(modelURL);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const blob = await response.blob(); // Lấy dưới dạng Blob để dễ tạo File
-                    const file = new File([blob], 'Default_model_v2.glb', { type: 'model/gltf-binary' });
-                    console.log('Dữ liệu model đã tải xong. Kích thước:', file.size);
-
-                    const targetElement = document.querySelector(dropTargetSelector);
-                    simulateDrop(targetElement, file);
-
-                } catch (error) {
-                    console.error('Lỗi khi tải hoặc tạo file GLB:', error);
-                    alert(`Không thể tải file GLB mặc định từ URL: ${error.message}`);
-                }
-            }
-
-            // Chờ cho phần tử đích xuất hiện trong DOM
-            const intervalId = setInterval(() => {
-                const targetElement = document.querySelector(dropTargetSelector);
-                // Chờ cả target element và có vẻ như viewer đã sẵn sàng (ví dụ: tip hiển thị)
-                if (targetElement && window.getComputedStyle(targetElement).display !== 'none') {
-                    clearInterval(intervalId);
-                    console.log('Phần tử đích đã sẵn sàng.');
-                    fetchAndDropModel();
-                } else {
-                    timeWaited += checkInterval;
-                    if (timeWaited >= maxWaitTime) {
-                        clearInterval(intervalId);
-                        console.error(`Không tìm thấy hoặc phần tử đích (${dropTargetSelector}) không sẵn sàng sau ${maxWaitTime / 1000} giây.`);
-                        alert('Không thể tự động tải mô hình. Vui lòng kéo thả file thủ công.');
-                    }
-                }
-            }, checkInterval);
-
-        })(); // IIFE
-    </script>
-
+    <script type="module"  src="js/sidebar.js"></script>
+    <script type="module"  src="js/main.js"></script>
+	
 </body>
 </html>

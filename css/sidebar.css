@@ -1,0 +1,39 @@
+/* sidebar.css */
+
+#sidebar { 
+  display: none; /* Ban đầu ẩn */
+  position: fixed; /* Cố định trên màn hình */
+  left: 0; /* Trôi về bên trái */
+  top: 0; /* Nối trên màn hình */
+  width: 300px; /* Chiều rộng sidebar */
+  height: 100%; /* Chiều cao toàn màn hình */
+  background: #f4f4f4; /* Màu nền */
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1); /* Đổ bóng phía bên phải */
+  padding: 20px; /* Khoảng cách bên trong */
+  overflow-y: auto; /* Cuộn dọc nếu nội dung dài hơn chiều cao */
+  z-index: 10; /* Đảm bảo sidebar nằm trên các thành phần khác */
+
+}
+
+#sidebar h3 {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: bold;
+  text-align: center;
+}
+
+#sidebar p {
+  margin: 5px 0;
+  font-size: 16px;
+}
+
+#sidebar .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 5px;
+  background: #ddd;
+  border-radius: 3px;
+}

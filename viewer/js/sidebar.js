@@ -100,3 +100,7 @@ panel
 
   .addStringInput(material, 'emissiveMap', { label: 'Emissive Map' })
   .addButton(material, 'clearEmissiveMap', { label: '×' });
+  const panelEl = document.querySelector('.panel');
+  panelEl.style.maxHeight = '90vh';
+  panelEl.style.overflowY = 'auto';
+  panelEl.style.overflowX = 'hidden';

@@ -30,7 +30,12 @@ export function updateSidebar(mesh) {
 
   gui.add(material, 'name').onChange(v => mesh.name = v);
   gui.addColor(material, 'baseColor').onChange(v => mat.color.set(v));
-  gui.add(material, 'alpha', 0, 1).onChange(v => mat.opacity = v);
+  
+  gui.add(material, 'alpha', 0, 1).onChange(v => {
+  mat.opacity = v;
+  mat.transparent = v < 1; // Quan trọng: bật chế độ trong suốt khi cần
+  });
+  
   gui.add(material, 'alphaCutoff', 0, 1).onChange(v => mat.alphaTest = v);
   gui.add(material, 'tiling', 0.1, 10).onChange(v => {
     ['map', 'normalMap', 'metalnessMap', 'roughnessMap', 'aoMap', 'emissiveMap'].forEach(key => {

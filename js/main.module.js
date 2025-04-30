@@ -166,6 +166,15 @@
 				}
 			}
 		}
+		annotationSprites.forEach((sprite, idx) => {
+			const ann = annotations[idx];
+			const mesh = currentModel.getObjectByProperty('uuid', ann.meshUUID);
+			if (mesh && ann.localPosition) {
+				const worldPos = mesh.localToWorld(new THREE.Vector3().fromArray(ann.localPosition));
+				sprite.position.copy(worldPos);
+			}
+		});
+
 		}
 		
 		
@@ -280,7 +289,44 @@
         function handleHDRIFileSelect(event) { const file = event.target.files[0]; if (file) { loadedHDRIFile = file; loadHDRI(file); } else { loadedHDRIFile = null; } event.target.value = null; }
 
         // --- Canvas Click/Double Click ---
-        function onDoubleClick(event) { if (!currentModel) { alert("Vui lòng tải model trước."); return; } updateMouseCoords(event); raycaster.setFromCamera(mouse, camera); raycaster.layers.set(0); const intersects = raycaster.intersectObject(currentModel, true); if (intersects.length > 0) { const intersectionPoint = intersects[0].point; const annotationName = prompt(`Annotation ${annotationCounter} - Tên:`, `Annotation ${annotationCounter}`); if (annotationName === null) return; if (annotationName.trim() === "") { alert("Tên không được trống."); return; } const annotationNote = prompt(`Annotation ${annotationCounter} (${annotationName}) - Nội dung:`, `Chi tiết...`); if (annotationNote === null) return; createAnnotation(intersectionPoint, annotationName.trim(), annotationNote); } }
+		function onDoubleClick(event) {
+			if (!currentModel) {
+				alert("Vui lòng tải model trước.");
+				return;
+			}
+
+			updateMouseCoords(event);
+			raycaster.setFromCamera(mouse, camera);
+			raycaster.layers.set(0);
+			const intersects = raycaster.intersectObject(currentModel, true);
+
+			if (intersects.length === 0) return;
+
+			const intersect = intersects[0];
+			const intersectionPoint = intersect.point;
+			const mesh = intersect.object;
+			const localPos = mesh.worldToLocal(intersectionPoint.clone());
+
+			const annotationName = prompt(`Annotation ${annotationCounter} - Tên:`, `Annotation ${annotationCounter}`);
+			if (annotationName === null) return;
+			if (annotationName.trim() === "") {
+				alert("Tên không được trống.");
+				return;
+			}
+
+			const annotationNote = prompt(`Annotation ${annotationCounter} (${annotationName}) - Nội dung:`, `Chi tiết...`);
+			if (annotationNote === null) return;
+
+			createAnnotation({
+				meshUUID: mesh.uuid,
+				localPosition: localPos.toArray(),
+				name: annotationName.trim(),
+				note: annotationNote,
+				cameraPosition: camera.position.clone(),
+				cameraTarget: controls.target.clone()
+			});
+		}
+
 
         function onSingleClick(event) {
             if (annotationSprites.length === 0) return;
@@ -307,45 +353,86 @@
         function updateMouseCoords(event) { const rect = renderer.domElement.getBoundingClientRect(); mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1; }
 
         // --- Annotation Logic ---
-        function createAnnotation(position, name, note) { const annotationData = { id: annotationCounter, name: name, note: note, position: position.clone(), cameraPosition: camera.position.clone(), cameraTarget: controls.target.clone() }; annotations.push(annotationData); const sprite = createAnnotationSprite(annotationData); sprite.visible = controlSettings.annotationsVisible; scene.add(sprite); annotationSprites.push(sprite); annotationCounter++; updateAnnotationListControlKit(); console.log("Annotation và view đã lưu:", annotationData); }
+		function createAnnotation({ meshUUID, localPosition, name, note, cameraPosition, cameraTarget }) {
+			const annotationData = {
+				id: annotationCounter,
+				name,
+				note,
+				meshUUID,
+				localPosition,
+				cameraPosition,
+				cameraTarget
+			};
+
+			const sprite = createAnnotationSprite(annotationData);
+			sprite.visible = controlSettings.annotationsVisible;
+			sprite.userData.annotationId = annotationData.id;
+			sprite.userData.meshUUID = meshUUID;
+
+			scene.add(sprite);
+			annotationSprites.push(sprite);
+			annotations.push(annotationData);
+			annotationCounter++;
+			updateAnnotationListControlKit();
+
+			console.log("Annotation và view đã lưu:", annotationData);
+		}
+
 		
-        function createAnnotationSprite(annotationData) {
-        	const canvas = document.createElement('canvas');
-        	const context = canvas.getContext('2d');
-        	const size = 64;
-        	canvas.width = size;
-        	canvas.height = size;
-        	const number = annotationData.id.toString();
-        	const radius = size / 2 - 4;
-        	context.fillStyle = 'rgba(0, 100, 220, 0.75)';
-        	context.beginPath();
-        	context.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
-        	context.fill();
-        	context.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        	context.lineWidth = 2;
-        	context.stroke();
-        	context.fillStyle = 'white';
-        	context.font = `bold ${size / 2.8}px Arial`;
-        	context.textAlign = 'center';
-        	context.textBaseline = 'middle';
-        	context.fillText(number, size / 2, size / 2 + 1);
-        	const texture = new THREE.CanvasTexture(canvas);
-        	texture.needsUpdate = true;
-        	const spriteMaterial = new THREE.SpriteMaterial({
-        		map: texture,
-        		sizeAttenuation: false,
-        		depthTest: false,
-        		transparent: true,
-        		opacity: 0.85
-        	});
-        	const sprite = new THREE.Sprite(spriteMaterial);
-        	sprite.position.copy(annotationData.position);
-        	sprite.scale.set(SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE);
-        	sprite.layers.set(ANNOTATION_LAYER);
-        	sprite.userData.annotationId = annotationData.id;
-        	sprite.userData.isAnnotation = true;
-        	return sprite;
-        }
+function createAnnotationSprite(annotationData) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const size = 64;
+    canvas.width = size;
+    canvas.height = size;
+
+    const number = annotationData.id.toString();
+    const radius = size / 2 - 4;
+    context.fillStyle = 'rgba(0, 100, 220, 0.75)';
+    context.beginPath();
+    context.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    context.lineWidth = 2;
+    context.stroke();
+
+    context.fillStyle = 'white';
+    context.font = `bold ${size / 2.8}px Arial`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(number, size / 2, size / 2 + 1);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+
+    const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        sizeAttenuation: false,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.85
+    });
+
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE);
+    sprite.layers.set(ANNOTATION_LAYER);
+    sprite.userData.annotationId = annotationData.id;
+    sprite.userData.meshUUID = annotationData.meshUUID;
+
+    // ✅ Tính lại position từ localPosition + mesh
+    const mesh = currentModel.getObjectByProperty('uuid', annotationData.meshUUID);
+    if (mesh && annotationData.localPosition) {
+        const worldPos = mesh.localToWorld(new THREE.Vector3().fromArray(annotationData.localPosition));
+        sprite.position.copy(worldPos);
+    } else {
+        console.warn("Không tìm thấy mesh hoặc localPosition khi tạo sprite.");
+        sprite.position.set(0, 0, 0); // fallback tránh crash
+    }
+
+    return sprite;
+}
+
 		
 		
         function updateAnnotationListControlKit() { if (!controlKit) return; controlKit.update(); }
@@ -626,8 +713,7 @@ function setupTimelineControls() {
 }
 
 function togglePlayPause() {
-    if (isDraggingSlider || animationActions.length === 0 || !progressSliderInstance) return;
-
+    if (animationActions.length === 0 || !progressSliderInstance) return;
     const newPaused = !animationActions[0].paused;
     if (!newPaused) {
         const t = progressSliderInstance.result.from;
@@ -637,6 +723,7 @@ function togglePlayPause() {
     animationActions.forEach(a => a.paused = newPaused);
     updatePlayPauseButton();
 }
+
 
 function updatePlayPauseButton() {
     const btn = document.getElementById('timeline-pause-resume');

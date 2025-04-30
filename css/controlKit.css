@@ -431,7 +431,7 @@
   color: #65696b; }
 
 #controlKit .panel .group-list .group .head {
-  height: 38px;
+  height: 18px;
   padding: 0 10px 0 10px;
   border-top: 1px solid #4f4f4f;
   border-bottom: 1px solid #262626;
@@ -440,7 +440,7 @@
   cursor: pointer; }
   #controlKit .panel .group-list .group .head .label {
     font-size: 12px;
-    line-height: 38px;
+    line-height: 18px;
     color: white; }
   #controlKit .panel .group-list .group .head:hover {
     border-top: 1px solid #525252;

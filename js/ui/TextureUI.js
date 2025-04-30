@@ -79,4 +79,4 @@ TextureUI.prototype.update = function () {
 };
 
 
-export default TextureUI;
+//export default TextureUI;

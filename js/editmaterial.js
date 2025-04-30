@@ -1,38 +1,68 @@
+let materialGUI = null;
+
 function showMaterialEditor(mesh, intersectPoint) {
     const mat = mesh.material;
     if (!mat || !mat.isMeshStandardMaterial) return;
 
-    console.log("Clicked Mesh Position:", intersectPoint);
+    if (materialGUI) {
+        materialGUI.destroy();
+        materialGUI = null;
+    }
 
-    const colorInput = document.getElementById('material-color');
-    const metalInput = document.getElementById('material-metalness');
-    const roughInput = document.getElementById('material-roughness');
-    const opacityInput = document.getElementById('material-opacity');
-    const emissiveInput = document.getElementById('material-emissive');
-	const emissiveIntensityInput = document.getElementById('material-emissive-intensity');
-    const transparentInput = document.getElementById('material-transparent');
-    const textureInput = document.getElementById('material-texture');
-    const panel = document.getElementById('material-editor-panel');
+    materialGUI = new dat.GUI({ width: 200 });
+    materialGUI.domElement.style.position = 'fixed';
+    materialGUI.domElement.style.top = '10px';
+    materialGUI.domElement.style.left = '10px';
+    materialGUI.domElement.style.zIndex = '9999';
 
-    colorInput.value = '#' + mat.color.getHexString();
-    metalInput.value = mat.metalness ?? 0.5;
-    roughInput.value = mat.roughness ?? 0.5;
-    opacityInput.value = mat.opacity ?? 1;
-    emissiveInput.value = '#' + mat.emissive?.getHexString?.() ?? '000000';
-	emissiveIntensityInput.value = mat.emissiveIntensity ?? 1;
-    transparentInput.checked = mat.transparent ?? false;
+    const closeObj = { close: () => {
+        materialGUI.destroy();
+        materialGUI = null;
+    }};
+    materialGUI.add(closeObj, 'close').name('❌ Đóng');
 
-    // Gán sự kiện cập nhật
-    colorInput.oninput = () => { mat.color.set(colorInput.value); mat.needsUpdate = true; };
-    metalInput.oninput = () => { mat.metalness = parseFloat(metalInput.value); mat.needsUpdate = true; };
-    roughInput.oninput = () => { mat.roughness = parseFloat(roughInput.value); mat.needsUpdate = true; };
-    opacityInput.oninput = () => { mat.opacity = parseFloat(opacityInput.value); mat.needsUpdate = true; };
-    emissiveInput.oninput = () => { mat.emissive = new THREE.Color(emissiveInput.value);  mat.needsUpdate = true;};
-	emissiveIntensityInput.oninput = () => { mat.emissiveIntensity = parseFloat(emissiveIntensityInput.value);    mat.needsUpdate = true;};
+    // === Position ===
+    const pos = mesh.position;
+    const posFolder = materialGUI.addFolder('Vị trí');
+    posFolder.add(pos, 'x', -50, 50).step(0.0001).name('X');
+    posFolder.add(pos, 'y', -50, 50).step(0.0001).name('Y');
+    posFolder.add(pos, 'z', -50, 50).step(0.0001).name('Z');
+    posFolder.open();
 
+    // === Rotation ===
+    const rot = mesh.rotation;
+    const rotFolder = materialGUI.addFolder('Xoay');
+    rotFolder.add(rot, 'x', -Math.PI, Math.PI).step(0.01).name('X');
+    rotFolder.add(rot, 'y', -Math.PI, Math.PI).step(0.01).name('Y');
+    rotFolder.add(rot, 'z', -Math.PI, Math.PI).step(0.01).name('Z');
+    rotFolder.open();
 
-    panel.style.display = 'block';
+    // === Scale ===
+    const scl = mesh.scale;
+    const sclFolder = materialGUI.addFolder('Tỉ lệ');
+    sclFolder.add(scl, 'x', 0.01, 10).step(0.01).name('X');
+    sclFolder.add(scl, 'y', 0.01, 10).step(0.01).name('Y');
+    sclFolder.add(scl, 'z', 0.01, 10).step(0.01).name('Z');
+    sclFolder.open();
+
+    // === Material ===
+    const matFolder = materialGUI.addFolder('Vật liệu');
+    matFolder.addColor({ color: '#' + mat.color.getHexString() }, 'color')
+        .name('Màu')
+        .onChange(v => { mat.color.set(v); mat.needsUpdate = true; });
+
+    matFolder.add(mat, 'metalness', 0, 1).step(0.01).name('Metalness');
+    matFolder.add(mat, 'roughness', 0, 1).step(0.01).name('Roughness');
+    matFolder.add(mat, 'transparent').name('Transparent').onChange(() => mat.needsUpdate = true);
+    matFolder.add(mat, 'opacity', 0, 1).step(0.01).name('Opacity');
+
+    matFolder.addColor({ emissive: '#' + mat.emissive.getHexString() }, 'emissive')
+        .name('Emissive')
+        .onChange(v => { mat.emissive.set(v); mat.needsUpdate = true; });
+    matFolder.add(mat, 'emissiveIntensity', 0, 10).step(0.1).name('Emissive Intensity');
+    matFolder.open();
 }
+
 
 export function handleMeshClick(event, renderer, camera, model) {
     const raycaster = new THREE.Raycaster();
@@ -45,5 +75,7 @@ export function handleMeshClick(event, renderer, camera, model) {
     const intersects = raycaster.intersectObject(model, true);
     if (intersects.length > 0) {
         showMaterialEditor(intersects[0].object, intersects[0].point);
+		console.log("🔍 Mesh được chọn:", intersects[0].object);
+
     }
 }

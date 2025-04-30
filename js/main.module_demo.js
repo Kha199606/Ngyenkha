@@ -17,6 +17,8 @@
 		let mixer, animationActions = [], longestAction = null, longestDuration = 0;
 		let progressSliderInstance, rangeSliderInstance, isDraggingSlider = false;
 		let annotationListGroup = null;
+		let pinModel = null;
+		const gltfLoader = new THREE.GLTFLoader();
 
 		
 		const materialsData = [];
@@ -86,6 +88,13 @@
 			makePopupDraggable();
             addEventListeners();
             initEditorModeControls();
+			
+			gltfLoader.load('../img/pin.glb', gltf => {
+				pinModel = gltf.scene;
+				console.log("✅ pin.glb loaded.");
+			}, undefined, err => {
+				console.error("❌ Không thể load pin.glb:", err);
+			});
 			
             console.log("Initialization complete (Editor Mode).");
 			
@@ -360,71 +369,69 @@
 		}
 
 
-function loadAnnotationsFromFileIfExists() {
-			fetch('../model/default.json')
+		function loadAnnotationsFromFileIfExists() {
+            // <<< Quan trọng: Chỉ chạy nếu pinModel đã load xong >>>
+            if (!pinModel) {
+                console.warn("[Load Annotations] Waiting for pinModel to load...");
+                return;
+            }
+             if (!currentModel) {
+                console.warn("[Load Annotations] Waiting for currentModel to load...");
+                return;
+             }
+
+			fetch('../model/default.json') // Hoặc tên file JSON của bạn
 				.then(res => {
-					if (!res.ok) throw new Error('Không tìm thấy default.json');
+					if (!res.ok) throw new Error(`Could not fetch default.json: ${res.statusText}`);
 					return res.json();
 				})
 				.then(data => {
-					// Log dữ liệu gốc đọc từ JSON để kiểm tra
-					console.log("[LOAD ANNOT] Dữ liệu JSON gốc:", data);
+					console.log("[LOAD ANNOT] Raw JSON data:", data);
 					if (!data || !Array.isArray(data.annotations)) {
-                         throw new Error("File JSON không hợp lệ hoặc thiếu mảng 'annotations'.");
+                         throw new Error("Invalid JSON file or missing 'annotations' array.");
                     }
 
-					annotations = data.annotations;
+                    // Xóa marker cũ trước khi load mới
+                    clearAnnotations(true); // true để chỉ xóa marker, không xóa data (sẽ ghi đè ngay sau đây)
+
+					annotations = data.annotations.map(annoData => ({
+                        ...annoData,
+                        // Chuyển đổi lại thành Vector3 khi cần
+                        cameraPositionVec: new THREE.Vector3().fromArray(annoData.cameraPosition || [0,1,5]),
+                        cameraTargetVec: new THREE.Vector3().fromArray(annoData.cameraTarget || [0,0,0])
+                    }));
 					annotationCounter = data.annotationCounter || (annotations.length + 1);
-					annotationSprites.length = 0; // Xóa sprites cũ
+					// annotationSprites array đã được xóa trong clearAnnotations
 
+                    let createdCount = 0;
 					annotations.forEach(annotationData => {
-                        // Log dữ liệu của annotation hiện tại
-                        console.log(`[LOAD ANNOT] Đang xử lý ID ${annotationData.id}. Dữ liệu:`, annotationData);
+                        console.log(`[LOAD ANNOT] Processing ID ${annotationData.id}. Data:`, annotationData);
 
-                        // Kiểm tra dữ liệu cần thiết trước khi tạo sprite
                         if (!annotationData.meshName || !annotationData.localPosition || !Array.isArray(annotationData.localPosition) || annotationData.localPosition.length !== 3) {
-                            console.error(`[LOAD ANNOT] Dữ liệu không hợp lệ cho annotation ID ${annotationData.id}. Bỏ qua.`);
-                            return; // Bỏ qua annotation này
+                            console.error(`[LOAD ANNOT] Invalid data for annotation ID ${annotationData.id}. Skipping. MeshName: ${annotationData.meshName}, LocalPos: ${annotationData.localPosition}`);
+                            return; // Bỏ qua annotation này nếu thiếu thông tin cơ bản
                         }
 
-                        // ---- Phần tính vị trí ban đầu (Optional nhưng nên có) ----
-                        let initialWorldPos = new THREE.Vector3(0,0,0);
-                        const mesh = currentModel ? currentModel.getObjectByName(annotationData.meshName) : null;
-                        if (mesh) {
-                            try {
-                                initialWorldPos = mesh.localToWorld(new THREE.Vector3().fromArray(annotationData.localPosition).clone());
-                            } catch(e) { console.error("Lỗi tính initial pos", e); }
+						// --- Tạo marker 3D từ dữ liệu đã load ---
+						const marker = createAnnotationMarker3D(annotationData);
+						if (marker) {
+                            marker.visible = controlSettings.annotationsVisible; // Đặt visibility ban đầu
+                            scene.add(marker);
+                            annotationSprites.push(marker); // Thêm marker mới vào mảng quản lý
+                            createdCount++;
+                            // userData đã được gán bên trong createAnnotationMarker3D
+                            console.log(`[LOAD ANNOT]   -> Successfully created and added marker for ID ${marker.userData.annotationId}`);
                         } else {
-                            console.warn(`[LOAD ANNOT] Không tìm thấy mesh '${annotationData.meshName}' cho ID ${annotationData.id} để đặt vị trí ban đầu.`);
+                             console.error(`[LOAD ANNOT]   -> Failed to create marker for ID ${annotationData.id}`);
                         }
-                        // ---- Hết phần tính vị trí ban đầu ----
-
-						// Tạo sprite (Truyền vị trí ban đầu nếu có)
-						const sprite = createAnnotationSprite(annotationData, initialWorldPos); // Giả sử hàm này nhận initialWorldPos
-						sprite.visible = controlSettings.annotationsVisible;
-
-						// !!! THÊM BƯỚC GÁN USERDATA Ở ĐÂY !!!
-						sprite.userData = {
-							annotationId: annotationData.id,
-							meshName: annotationData.meshName,
-							positionData: annotationData.localPosition,
-                            // Có thể thêm name/note nếu cần
-                            name: annotationData.name,
-                            note: annotationData.note
-						};
-                        // Log để xác nhận việc gán
-                        console.log(`[LOAD ANNOT]   -> Đã gán userData cho Sprite ID ${sprite.userData.annotationId}:`, sprite.userData);
-
-
-						scene.add(sprite);
-						annotationSprites.push(sprite);
 					});
 
-					// updateAnnotationListControlKit(); // Gọi nếu cần cập nhật UI
-					console.log(`[LOAD ANNOT] Đã load xong ${annotationSprites.length} annotations từ default.json`);
+					// updateAnnotationListControlKit(); // Cập nhật UI nếu có
+					console.log(`[LOAD ANNOT] Finished loading. Created ${createdCount} / ${annotations.length} annotation markers from default.json`);
 				})
 				.catch(err => {
-					console.warn("[LOAD ANNOT] Không thể load default.json:", err.message);
+					console.warn("[LOAD ANNOT] Could not load or parse default.json:", err.message);
+                    // Không cần xóa annotations ở đây vì có thể là lần load đầu tiên
 				});
 		}
 
@@ -599,13 +606,14 @@ function loadAnnotationsFromFileIfExists() {
 				cameraTarget
 			};
 
-			const sprite = createAnnotationSprite(annotationData);
-			sprite.visible = controlSettings.annotationsVisible;
-			sprite.userData.annotationId = annotationData.id;
-			sprite.userData.meshName = annotationData.meshName;
+			const marker = createAnnotationMarker3D(annotationData);
+			if (marker) {
+				marker.visible = controlSettings.annotationsVisible;
+				scene.add(marker);
+				annotationSprites.push(marker);
+			}
 
-			scene.add(sprite);
-			annotationSprites.push(sprite);
+			
 			annotations.push(annotationData);
 			annotationCounter++;
 			updateAnnotationListControlKit();
@@ -614,60 +622,39 @@ function loadAnnotationsFromFileIfExists() {
 		}
 
 		
-		function createAnnotationSprite(annotationData) {
-			const canvas = document.createElement('canvas');
-			const context = canvas.getContext('2d');
-			const size = 64;
-			canvas.width = size;
-			canvas.height = size;
-
-			const number = annotationData.id.toString();
-			const radius = size / 2 - 4;
-			context.fillStyle = 'rgba(0, 100, 220, 0.75)';
-			context.beginPath();
-			context.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
-			context.fill();
-
-			context.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-			context.lineWidth = 2;
-			context.stroke();
-
-			context.fillStyle = 'white';
-			context.font = `bold ${size / 2.8}px Arial`;
-			context.textAlign = 'center';
-			context.textBaseline = 'middle';
-			context.fillText(number, size / 2, size / 2 + 1);
-
-			const texture = new THREE.CanvasTexture(canvas);
-			texture.needsUpdate = true;
-
-			const spriteMaterial = new THREE.SpriteMaterial({
-				map: texture,
-				sizeAttenuation: false,
-				depthTest: false,
-				transparent: true,
-				opacity: 0.85
-			});
-
-			const sprite = new THREE.Sprite(spriteMaterial);
-			sprite.scale.set(SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE);
-			sprite.layers.set(ANNOTATION_LAYER);
-			sprite.userData.annotationId = annotationData.id;
-			sprite.userData.meshName = annotationData.meshName;
-
-			// ✅ Tính lại position từ localPosition + mesh
-			const mesh = currentModel.getObjectByName(annotationData.meshName);
-
-			if (mesh && annotationData.localPosition) {
-				const worldPos = mesh.localToWorld(new THREE.Vector3().fromArray(annotationData.localPosition));
-				sprite.position.copy(worldPos);
-			} else {
-				console.warn(`Không tìm thấy mesh cho annotation ID ${annotationData.id}`);
-				sprite.position.set(0, 0, 0); // fallback để tránh lỗi
+		function createAnnotationMarker3D(annotationData) {
+			if (!pinModel) {
+				console.warn("⚠️ Chưa load xong pin.glb.");
+				return null;
 			}
 
-			return sprite;
+			const marker = pinModel.clone(true);
+			marker.traverse(child => {
+				if (child.isMesh) {
+					child.material = child.material.clone();
+					child.material.depthTest = true;
+				}
+			});
+
+			marker.scale.set(0.2, 0.2, 0.2); // Tùy chỉnh scale marker
+			marker.userData.annotationId = annotationData.id;
+			marker.userData.meshName = annotationData.meshName;
+			marker.userData.positionData = annotationData.localPosition;
+			marker.layers.set(ANNOTATION_LAYER);
+
+			const mesh = currentModel?.getObjectByName(annotationData.meshName);
+			if (mesh && annotationData.localPosition) {
+				const worldPos = mesh.localToWorld(new THREE.Vector3().fromArray(annotationData.localPosition));
+				marker.position.copy(worldPos);
+			} else {
+				console.warn(`Không tìm thấy mesh cho annotation ID ${annotationData.id}`);
+				marker.position.set(0, 0, 0);
+			}
+
+			return marker;
 		}
+
+
 
 
 
@@ -717,7 +704,55 @@ function loadAnnotationsFromFileIfExists() {
 
 
         function toggleAnnotationsVisibility(isVisible) { console.log(`Setting annotation visibility to: ${isVisible}`); annotationSprites.forEach(sprite => { sprite.visible = isVisible; }); if (!isVisible) { hideAnnotationPopup(); } }
-        function clearAnnotations() { hideAnnotationPopup(); currentPopupAnnotationId = null; annotationSprites.forEach(sprite => { if (sprite.material.map) sprite.material.map.dispose(); sprite.material.dispose(); scene.remove(sprite); }); annotationSprites.length = 0; annotations = []; annotationCounter = 1; updateAnnotationListControlKit(); console.log("Tất cả annotations đã được xóa."); }
+
+       // --- Cập nhật hàm xóa để xử lý Object3D ---
+		function clearAnnotations(markersOnly = false) {
+            console.log(`Clearing annotations... (Markers only: ${markersOnly})`);
+			hideAnnotationPopup();
+			currentPopupAnnotationId = null;
+
+			annotationSprites.forEach(marker => {
+				if (marker) {
+					// --- Dispose geometries and materials ---
+					marker.traverse(child => {
+						if (child.isMesh) {
+							if (child.geometry) {
+								child.geometry.dispose();
+                                // console.log("Disposed geometry for marker child");
+							}
+							if (child.material) {
+                                // Nếu material là array (MultiMaterial)
+                                if (Array.isArray(child.material)) {
+                                    child.material.forEach(mat => mat.dispose());
+                                } else {
+                                    // Dispose textures if they exist
+                                    for (const key in child.material) {
+                                        const value = child.material[key];
+                                        if (value && typeof value === 'object' && value.isTexture) {
+                                            value.dispose();
+                                            // console.log(`Disposed texture ${key}`);
+                                        }
+                                    }
+                                    child.material.dispose();
+                                }
+                                // console.log("Disposed material(s) for marker child");
+							}
+						}
+					});
+					// --- Remove from scene ---
+					scene.remove(marker);
+				}
+			});
+			annotationSprites.length = 0; // Clear the array
+
+            if (!markersOnly) {
+                annotations = []; // Clear data array
+                annotationCounter = 1; // Reset counter
+                console.log("Annotation data cleared.");
+            }
+			// updateAnnotationListControlKit(); // Cập nhật UI nếu có
+			console.log("All annotation markers removed from scene.");
+		}
 
         // --- Popup Logic ---
         function updatePopupContent(annotationData) { if (!popupNameElement || !popupNoteElement) { console.error("updatePopupContent failed: Popup elements not ready!"); return; } if (!annotationData) { hideAnnotationPopup(); return; } popupNameElement.textContent = annotationData.name || '[Không tên]'; popupNoteElement.textContent = annotationData.note || ''; currentPopupAnnotationId = annotationData.id; updatePopupNavButtons(); }

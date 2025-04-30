@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Three.js Annotations - HTML Export (JSON Fix)</title>
+    <title>NK 3D Editor</title>
  
 	<link rel="stylesheet" href="css/controlKit.css"> <!-- Adjust path if needed -->
     <link rel="stylesheet" href="css/main.css">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/css/ion.rangeSlider.min.css"/>
+	<!-- dat.GUI -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #1a1a1a; color: #fff; }
@@ -60,7 +63,7 @@
         </div>
     </div>
     <!-- Annotation Popup HTML -->
-    <div id="annotation-popup">
+    <div id="annotation-popup"  style="position: absolute; cursor: move; user-select: none;">
         <button id="popup-close">X</button>
         <h4 id="popup-name">Annotation Name</h4>
         <p id="popup-note">Annotation details will appear here.</p>
@@ -70,63 +73,7 @@
         </div>
     </div>   
    <!-- panel vật liệu -->
-<div id="material-editor-panel" style="
-    position: absolute;
-    top: 50px;
-    left: 15px;
-    width: 220px;
-    background-color: rgba(34, 34, 34, 0.9);
-    border: 1px solid #555;
-    border-radius: 6px;
-    z-index: 1002;
-    display: none;
-    color: #ddd;
-    font-family: sans-serif;
-    font-size: 0.85em;
-    box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.2);
-">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px 10px; cursor: grab;"> <strong style="font-size: 1em;">Vật Liệu</strong>
-        <button onclick="document.getElementById('material-editor-panel').style.display='none'"
-            style="background: none; color: #aaa; border: none; font-weight: bold; font-size: 1em; cursor: pointer; opacity: 0.7; transition: opacity 0.2s ease-in-out;"
-            onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">×</button>
-    </div>
-    <hr style="border-color: #555; margin-bottom: 5px;"> <div style="margin-bottom: 6px; padding: 0 10px;"> <label for="material-color" style="display: block; margin-bottom: 2px;">Màu:</label>
-        <input type="color" id="material-color" style="width: 100%; border: none; padding: 4px; border-radius: 3px; background-color: #444; color: #eee; cursor: pointer;">
-    </div>
 
-    <div style="margin-bottom: 6px; padding: 0 10px;">
-        <label for="material-metalness" style="display: block; margin-bottom: 2px;">Kim Loại:</label>
-        <input type="range" id="material-metalness" min="0" max="1" step="0.01" style="width: 100%; height: 16px; cursor: pointer;">
-    </div>
-
-    <div style="margin-bottom: 6px; padding: 0 10px;">
-        <label for="material-roughness" style="display: block; margin-bottom: 2px;">Độ Nhám:</label>
-        <input type="range" id="material-roughness" min="0" max="1" step="0.01" style="width: 100%; height: 16px; cursor: pointer;">
-    </div>
-
-    <div style="margin-bottom: 6px; padding: 0 10px;">
-        <label for="material-opacity" style="display: block; margin-bottom: 2px;">Độ Mờ:</label>
-        <input type="range" id="material-opacity" min="0" max="1" step="0.01" style="width: 100%; height: 16px; cursor: pointer;">
-    </div>
-
-    <div style="margin-bottom: 6px; padding: 0 10px;">
-        <label for="material-emissive" style="display: block; margin-bottom: 2px;">Phát Sáng:</label>
-        <input type="color" id="material-emissive" value="#000000" style="width: 100%; border: none; padding: 4px; border-radius: 3px; background-color: #444; color: #eee; cursor: pointer;">
-    </div>
-
-    <div style="margin-bottom: 8px; padding: 0 10px;">
-        <label for="material-emissive-intensity" style="display: block; margin-bottom: 2px;">Cường Độ:</label>
-        <input type="range" id="material-emissive-intensity" min="0" max="10" step="0.1" style="width: 100%; height: 16px; cursor: pointer;">
-    </div>
-
-    <div style="padding: 0 10px;">
-        <label style="display: flex; align-items: center; font-size: 0.9em;">
-            <input type="checkbox" id="material-transparent" style="margin-right: 5px; cursor: pointer;">
-            Trong Suốt
-        </label>
-    </div>
-
-</div>
 		<!-- Animation Control Bar -->
 
     <!-- Hidden file inputs -->
@@ -145,7 +92,7 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/ion-rangeslider/2.3.1/js/ion.rangeSlider.min.js"></script>
 
     <script type="module" src="js/main.module.js"></script>
-    <script src="js/panelmat_move.js"></script>	
+ 
 
 </body>
 </html>

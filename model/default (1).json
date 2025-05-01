@@ -1,0 +1,27 @@
+{
+  "annotations": [
+    {
+      "id": 1,
+      "name": "Annotation 1",
+      "note": "Chi tiết...",
+      "meshName": "Cube",
+      "animationTime": 4.67,
+      "localPosition": [
+        -0.014049761874365324,
+        0.0005000000237489477,
+        -0.003548033208079837
+      ],
+      "cameraPosition": {
+        "x": 0.00800478854556319,
+        "y": 1.150597476642639,
+        "z": 0.3567507359039782
+      },
+      "cameraTarget": {
+        "x": 0.443959,
+        "y": 1.014805,
+        "z": 0.020001
+      }
+    }
+  ],
+  "annotationCounter": 2
+}

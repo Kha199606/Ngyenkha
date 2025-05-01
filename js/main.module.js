@@ -122,10 +122,7 @@
         function initThree() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(controlSettings.backgroundColor);
-            const canvas = document.getElementById('three-canvas');
-			
-		
-			
+            const canvas = document.getElementById('three-canvas');		
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
             camera.position.set(0, 1, 5);
             camera.layers.enable(0);
@@ -460,6 +457,7 @@ function loadAnnotationsFromFileIfExists() {
 			let offsetX = 0;
 			let offsetY = 0;
 
+			// --- Mouse ---
 			function onMouseDown(e) {
 				isDragging = true;
 				const rect = popup.getBoundingClientRect();
@@ -481,7 +479,7 @@ function loadAnnotationsFromFileIfExists() {
 				document.removeEventListener('mouseup', onMouseUp);
 			}
 
-			// Touch support
+			// --- Touch ---
 			function onTouchStart(e) {
 				if (e.touches.length !== 1) return;
 				isDragging = true;
@@ -505,8 +503,9 @@ function loadAnnotationsFromFileIfExists() {
 			}
 
 			dragHandle.addEventListener('mousedown', onMouseDown);
-//			dragHandle.addEventListener('touchstart', onTouchStart);
+			dragHandle.addEventListener('touchstart', onTouchStart, { passive: false }); // 👈 để có thể kéo
 		}
+
 
 
         // --- Event Listeners ---

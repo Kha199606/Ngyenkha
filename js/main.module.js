@@ -90,7 +90,7 @@
             console.log("Initialization complete (Editor Mode).");
 			document.addEventListener('touchstart', () => {}, { passive: true });
 			// --- Tự động tải file mặc định nếu không có gì được chọn
-			fetch('../model/default.glb')
+			fetch('./default.glb')
 			  .then(response => {
 				if (!response.ok) throw new Error('Không tìm thấy default.glb');
 				return response.blob();
@@ -102,7 +102,7 @@
 			  })
 			  .catch(err => console.warn('Không thể tải default.glb:', err));
 
-			fetch('../model/default.hdr')
+			fetch('./default.hdr')
 			  .then(response => {
 				if (!response.ok) throw new Error('Không tìm thấy default.hdr');
 				return response.blob();

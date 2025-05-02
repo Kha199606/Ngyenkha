@@ -359,7 +359,7 @@
 
 
 function loadAnnotationsFromFileIfExists() {
-			fetch('../Ngyenkha/model/default.json')
+			fetch('./default.json')
 				.then(res => {
 					if (!res.ok) throw new Error('Không tìm thấy default.json');
 					return res.json();

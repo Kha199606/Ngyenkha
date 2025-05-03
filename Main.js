@@ -59,7 +59,34 @@
                     const modelDataUrl = await readFileAsDataURL(loadedModelFile);
                     const hdriDataUrl = loadedHDRIFile ? await readFileAsDataURL(loadedHDRIFile) : null;
                     if (!modelDataUrl) throw new Error("Không thể đọc dữ liệu model.");
-                    const dataToEmbed = { modelDataUrl, modelFileName: loadedModelFile.name, hdriDataUrl, annotations, exposure: controlSettings.exposure, annotationsVisible: controlSettings.annotationsVisible };
+					
+					
+						// 👇 Clone annotations và tính thêm position (world space)
+						const annotationsWithWorldPos = annotations.map(a => {
+							const mesh = currentModel?.getObjectByName(a.meshName);
+							let position = { x: 0, y: 0, z: 0 };
+							if (mesh && Array.isArray(a.localPosition)) {
+								try {
+									const worldPos = mesh.localToWorld(new THREE.Vector3().fromArray(a.localPosition));
+									position = { x: worldPos.x, y: worldPos.y, z: worldPos.z };
+								} catch (e) {
+									console.warn(`[Export] Không thể tính position cho annotation ID ${a.id}`, e);
+								}
+							}
+							return { ...a, position }; // 👉 thêm field position
+						});
+
+						const dataToEmbed = {
+						  modelDataUrl,
+						  modelFileName: loadedModelFile.name,
+						  hdriDataUrl,
+						  annotations: annotationsWithWorldPos,
+						  exposure: controlSettings.exposure,
+						  annotationsVisible: controlSettings.annotationsVisible,
+						  materialsData
+						};
+					
+					
 					dataToEmbed.materialsData = materialsData;
                     let embeddedDataJSONString;
                     try {
@@ -262,6 +289,22 @@
 					label: 'Màu nền',
 					onChange: (value) => {
 						scene.background = new THREE.Color(value);
+						    // Xoá HDRI và background sphere nếu có
+						if (currentEnvMap) {
+							currentEnvMap.dispose();
+							currentEnvMap = null;
+							scene.environment = null;
+						}
+						if (backgroundSphere) {
+							scene.remove(backgroundSphere);
+							backgroundSphere.geometry.dispose();
+							backgroundSphere.material.dispose();
+							backgroundSphere = null;
+						}
+
+						// Reset tên file HDRI trên UI
+						controlSettings.hdriFileName = 'Chưa chọn file';
+						controlKit.update();
 					}
 				})
 				.addNumberInput(controlSettings, 'exposure', {
@@ -310,6 +353,7 @@
 						directionalLight.intensity = val;
 					}
 				});
+
 				const annotationMainGroup = mainPanel.addGroup({
 					label: 'Annotations'
 				});
@@ -1174,77 +1218,234 @@ function autoIncrementTimeline() {
 }
 
 
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
         // --- Helper: Create Viewer HTML Template ---
-        function createViewerHTML(embeddedDataJSONString) { // <<< embeddedDataJSONString là chuỗi đã stringify 2 lần
-            return `
+function createViewerHTML(embeddedDataJSONString) {
+    return `
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>3D Model Viewer</title>
-    <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #1a1a1a; color: #fff; } #info { position: absolute; top: 10px; width: 100%; text-align: center; z-index: 1; pointer-events: none; color: #ccc; font-size: 0.9em; } #three-canvas { display: block; width: 100vw; height: 100vh; cursor: default; } #annotation-popup { visibility: hidden; opacity: 0; position: absolute; background-color: rgba(40, 40, 40, 0.9); border: 1px solid #666; border-radius: 5px; padding: 10px 15px; padding-bottom: 35px; color: #eee; max-width: 250px; min-width: 180px; z-index: 1001; pointer-events: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size: 0.9em; line-height: 1.4; -webkit-user-select: none; -ms-user-select: none; user-select: none; transition: opacity 0.2s ease-in-out; } #annotation-popup.visible { visibility: visible; opacity: 1; } #annotation-popup h4 { margin: 0 0 8px 0; padding-bottom: 5px; border-bottom: 1px solid #555; font-size: 1.1em; color: #00aaff; } #annotation-popup p { margin: 0; white-space: pre-wrap; word-wrap: break-word; } #popup-close { position: absolute; top: 5px; right: 5px; background: rgba(80, 80, 80, 0.8); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; line-height: 18px; text-align: center; font-weight: bold; cursor: pointer; font-size: 14px; padding: 0; z-index: 2; } #popup-close:hover { background: rgba(120, 0, 0, 0.9); } .popup-nav { position: absolute; bottom: 8px; left: 15px; right: 15px; display: flex; justify-content: space-between; } .popup-nav button { background: rgba(80, 80, 80, 0.8); color: #fff; border: 1px solid #aaa; border-radius: 3px; padding: 2px 10px; cursor: pointer; font-size: 1.1em; } .popup-nav button:hover:not(:disabled) { background: rgba(100, 100, 100, 0.9); } .popup-nav button:disabled { opacity: 0.4; cursor: not-allowed; } #viewer-controls { position: absolute; bottom: 15px; right: 15px; z-index: 100; background-color: rgba(40, 40, 40, 0.8); padding: 8px 12px; border-radius: 5px; } #viewer-controls label { margin-right: 8px; vertical-align: middle; } #viewer-controls input[type="checkbox"] { vertical-align: middle; }
-    </style>
+  <meta charset="UTF-8" />
+  <title>3D Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #annotation-popup {
+      visibility: hidden; opacity: 0;
+      position: absolute; background-color: rgba(40, 40, 40, 0.9);
+      border: 1px solid #666; border-radius: 5px; padding: 10px 15px 35px;
+      color: #eee; max-width: 250px; z-index: 1001;
+      font-family: sans-serif; font-size: 0.9em; line-height: 1.4;
+      transition: opacity 0.2s ease-in-out;
+    }
+    #annotation-popup.visible { visibility: visible; opacity: 1; }
+    #annotation-popup h4 { margin: 0 0 8px; color: #00aaff; }
+    #popup-close {
+      position: absolute; top: 5px; right: 5px;
+      background: #444; color: #fff; border: none;
+      width: 20px; height: 20px; border-radius: 50%;
+      text-align: center; cursor: pointer;
+    }
+    #timeline-container {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 10; color: white; font-family: sans-serif;
+      display: flex; align-items: center;
+    }
+    #timeline-slider {
+      width: 300px; margin: 0 10px;
+    }
+  </style>
 </head>
 <body>
-    <div id="info">Đang tải viewer...</div> <canvas id="three-canvas"></canvas>
-    <div id="annotation-popup"> <button id="popup-close">X</button> <h4 id="popup-name">Name</h4> <p id="popup-note">Note</p> <div class="popup-nav"> <button id="popup-prev">< Trước</button> <button id="popup-next">Sau ></button> </div> </div>
-    <div id="viewer-controls"> <label for="viewer-toggle-annotations">Hiện Annotations:</label> <input type="checkbox" id="viewer-toggle-annotations"> </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>
-    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/script> <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/RGBELoader.js"><\/script> <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js"><\/script> <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script> <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.5/gsap.min.js"><\/script>
-    <script>
-        let scene, camera, renderer, controls, currentModel, currentEnvMap; const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2(); let annotations = []; const annotationSprites = []; let annotationCounter = 1; const ANNOTATION_LAYER = 1; let popupElement, popupNameElement, popupNoteElement, popupCloseButton, popupPrevButton, popupNextButton; let currentPopupAnnotationId = null; const SPRITE_SCREEN_SIZE = 0.07; let annotationsVisible = true; let viewerToggleCheckbox = null; let embeddedData = null;
-        const viewerDataString = ${embeddedDataJSONString}; // <<< Nhúng chuỗi JS
+  <canvas id="three-canvas"></canvas>
+  <div id="annotation-popup">
+    <button id="popup-close">X</button>
+    <h4 id="popup-name">[Tên]</h4>
+    <p id="popup-note">[Ghi chú]</p>
+  </div>
+  <div id="timeline-container" style="display:none;">
+    <span>Time:</span>
+    <input type="range" id="timeline-slider" min="0" max="1" step="0.01" value="0" />
+    <button id="play-pause-btn">⏸</button>
+  </div>
 
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("Viewer DOM loaded."); try { embeddedData = JSON.parse(viewerDataString); console.log("Embedded data parsed:", embeddedData); annotationsVisible = embeddedData.annotationsVisible !== undefined ? embeddedData.annotationsVisible : true; initViewerUI(); initThree(); initPopup(); addEventListeners(); loadDataFromEmbed(); } catch (error) { console.error("Lỗi parse/xử lý dữ liệu nhúng:", error); document.getElementById('info').textContent = 'Lỗi tải dữ liệu viewer!'; alert("Lỗi tải dữ liệu viewer."); } });
-        function initViewerUI() { document.getElementById('info').textContent = 'Chế độ xem'; const controlsDiv = document.getElementById('viewer-controls'); viewerToggleCheckbox = document.getElementById('viewer-toggle-annotations'); if (controlsDiv && viewerToggleCheckbox) { controlsDiv.style.display = 'block'; viewerToggleCheckbox.checked = annotationsVisible; viewerToggleCheckbox.addEventListener('change', (event) => { annotationsVisible = event.target.checked; toggleAnnotationsVisibility(annotationsVisible); }); } else { console.error("Viewer controls missing."); } }
-        function initThree() { scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a1a1a); const canvas = document.getElementById('three-canvas'); camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000); camera.position.set(0, 1, 5); camera.layers.enable(0); camera.layers.enable(ANNOTATION_LAYER); renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(window.devicePixelRatio); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.outputEncoding = THREE.sRGBEncoding; controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.05; controls.target.set(0, 1, 0); controls.update(); const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); scene.add(ambientLight); const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); directionalLight.position.set(5, 10, 7.5); scene.add(directionalLight); animate(); }
-		
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
-		
-        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); hideAnnotationPopup(); }
-        function initPopup() { popupElement = document.getElementById('annotation-popup'); popupNameElement = document.getElementById('popup-name'); popupNoteElement = document.getElementById('popup-note'); popupCloseButton = document.getElementById('popup-close'); popupPrevButton = document.getElementById('popup-prev'); popupNextButton = document.getElementById('popup-next'); if (!popupElement || !popupNameElement || !popupNoteElement || !popupCloseButton || !popupPrevButton || !popupNextButton) { console.error("Lỗi Popup Elements!"); return; } popupCloseButton.addEventListener('click', hideAnnotationPopup); popupPrevButton.addEventListener('click', navigateToPreviousAnnotation); popupNextButton.addEventListener('click', navigateToNextAnnotation); }
-        function addEventListeners() { window.addEventListener('resize', onWindowResize); renderer.domElement.addEventListener('click', onSingleClick); }
-        function loadDataFromEmbed() { if (!embeddedData) return; console.log("Loading from embed..."); if (embeddedData.exposure !== undefined) { renderer.toneMappingExposure = parseFloat(embeddedData.exposure) || 1.0; } try { if (!Array.isArray(embeddedData.annotations)) throw new Error("Invalid annotations data."); annotations = embeddedData.annotations.map(a => ({ ...a, position: new THREE.Vector3(a.position?.x || 0, a.position?.y || 0, a.position?.z || 0), cameraPosition: new THREE.Vector3(a.cameraPosition?.x || 0, a.cameraPosition?.y || 0, a.cameraPosition?.z || 0), cameraTarget: new THREE.Vector3(a.cameraTarget?.x || 0, a.cameraTarget?.y || 0, a.cameraTarget?.z || 0) })); annotationCounter = annotations.length > 0 ? Math.max(...annotations.map(a => a.id)) + 1 : 1; recreateAnnotationSpritesFromData(); toggleAnnotationsVisibility(annotationsVisible); } catch (e) { console.error("Lỗi annotations:", e); annotations = []; } const hdriPromise = new Promise((resolve) => { if (embeddedData.hdriDataUrl) { const loader = new THREE.RGBELoader(); loader.load(embeddedData.hdriDataUrl, (texture) => { texture.mapping = THREE.EquirectangularReflectionMapping; if (currentEnvMap) currentEnvMap.dispose(); scene.background = texture; scene.environment = texture; currentEnvMap = texture; resolve(); }, undefined, (error) => { console.error("Lỗi tải HDRI:", error); resolve(); }); } else { resolve(); } }); hdriPromise.then(() => { if (embeddedData.modelDataUrl && embeddedData.modelFileName) { let loader; const modelFilenameLower = embeddedData.modelFileName.toLowerCase(); try { if (modelFilenameLower.endsWith('.gltf') || modelFilenameLower.endsWith('.glb')) { loader = new THREE.GLTFLoader(); } else if (modelFilenameLower.endsWith('.obj')) { loader = new THREE.OBJLoader(); } else { throw new Error("Unsupported format."); } loader.load(embeddedData.modelDataUrl, (result) => { const modelToAdd = result.scene ? result.scene : result; if (!modelToAdd || !(modelToAdd instanceof THREE.Object3D)) throw new Error("Invalid model."); if(currentModel) scene.remove(currentModel); modelToAdd.traverse(child => { if (child.isMesh) { child.layers.set(0); applyEnvMapToModel(modelToAdd, currentEnvMap); } }); scene.add(modelToAdd); currentModel = modelToAdd; fitCameraToObject(currentModel, 1.5); document.getElementById('info').textContent = \`Xem model: \${embeddedData.modelFileName}\`; }, undefined, (error) => { console.error(\`Lỗi tải model:\`, error); alert("Lỗi tải model."); document.getElementById('info').textContent = 'Lỗi tải model!'; }); } catch(loaderError) { console.error("Lỗi loader model:", loaderError); alert("Lỗi xử lý model."); document.getElementById('info').textContent = 'Lỗi tải model!'; } } else { console.error("Thiếu model data/filename."); document.getElementById('info').textContent = 'Lỗi thiếu dữ liệu model!'; } }); }
-        function onSingleClick(event) { if (annotationSprites.length === 0) return; updateMouseCoords(event); raycaster.setFromCamera(mouse, camera); raycaster.layers.set(ANNOTATION_LAYER); const intersects = raycaster.intersectObjects(annotationSprites.filter(s => s.visible), false); if (intersects.length > 0) { const clickedSprite = intersects[0].object; const annotationId = clickedSprite.userData.annotationId; const annotation = annotations.find(a => a.id === annotationId); if (annotation) { updatePopupContent(annotation); animateCameraToView(annotation.cameraPosition, annotation.cameraTarget); } } else { hideAnnotationPopup(); } }
-        function updateMouseCoords(event) { const rect = renderer.domElement.getBoundingClientRect(); mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1; }
-        function createAnnotationSprite(annotationData) { const canvas = document.createElement('canvas'); const context = canvas.getContext('2d'); const size = 64; canvas.width = size; canvas.height = size; const number = annotationData.id.toString(); const radius = size / 2 - 4; context.fillStyle = 'rgba(0, 100, 220, 0.75)'; context.beginPath(); context.arc(size / 2, size / 2, radius, 0, Math.PI * 2); context.fill(); context.strokeStyle = 'rgba(255, 255, 255, 0.8)'; context.lineWidth = 2; context.stroke(); context.fillStyle = 'white'; context.font = \`bold \${size / 2.8}px Arial\`; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(number, size / 2, size / 2 + 1); const texture = new THREE.CanvasTexture(canvas); texture.needsUpdate = true; const spriteMaterial = new THREE.SpriteMaterial({ map: texture, sizeAttenuation: false, depthTest: false, transparent: true, opacity: 0.85 }); const sprite = new THREE.Sprite(spriteMaterial); sprite.position.copy(annotationData.position); sprite.scale.set(SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE, SPRITE_SCREEN_SIZE); sprite.layers.set(ANNOTATION_LAYER); sprite.userData.annotationId = annotationData.id; sprite.userData.isAnnotation = true; return sprite; }
-        function recreateAnnotationSpritesFromData() { annotationSprites.forEach(sprite => scene.remove(sprite)); annotationSprites.length = 0; annotations.forEach(annotationData => { try { if (!annotationData.position || typeof annotationData.position !== 'object') throw new Error('Missing position'); annotationData.position = new THREE.Vector3(annotationData.position.x, annotationData.position.y, annotationData.position.z); if (annotationData.cameraPosition && typeof annotationData.cameraPosition === 'object') annotationData.cameraPosition = new THREE.Vector3(annotationData.cameraPosition.x, annotationData.cameraPosition.y, annotationData.cameraPosition.z); else annotationData.cameraPosition = new THREE.Vector3(); if (annotationData.cameraTarget && typeof annotationData.cameraTarget === 'object') annotationData.cameraTarget = new THREE.Vector3(annotationData.cameraTarget.x, annotationData.cameraTarget.y, annotationData.cameraTarget.z); else annotationData.cameraTarget = new THREE.Vector3(); const sprite = createAnnotationSprite(annotationData); sprite.visible = annotationsVisible; scene.add(sprite); annotationSprites.push(sprite); } catch(e) { console.error(\`Error recreating sprite for annotation \${annotationData.id}:\`, e); } }); console.log(\`Viewer: Recreated \${annotationSprites.length} sprites.\`); }
-        function toggleAnnotationsVisibility(isVisible) { annotationSprites.forEach(sprite => { sprite.visible = isVisible; }); if (!isVisible) hideAnnotationPopup(); if (viewerToggleCheckbox && viewerToggleCheckbox.checked !== isVisible) viewerToggleCheckbox.checked = isVisible; }
-        function updatePopupContent(annotationData) { if (!popupNameElement || !popupNoteElement) return; if (!annotationData) { hideAnnotationPopup(); return; } popupNameElement.textContent = annotationData.name || '[No Name]'; popupNoteElement.textContent = annotationData.note || ''; currentPopupAnnotationId = annotationData.id; updatePopupNavButtons(); }
-        function repositionCurrentPopup() { if (!popupElement || currentPopupAnnotationId === null) return; const annotation = annotations.find(a => a.id === currentPopupAnnotationId); if (!annotation) { hideAnnotationPopup(); return; } const position3D = annotation.position.clone(); const vector = position3D.project(camera); if (vector.z > 1) { hideAnnotationPopup(); return; } const screenX = (vector.x * 0.5 + 0.5) * renderer.domElement.clientWidth; const screenY = (-vector.y * 0.5 + 0.5) * renderer.domElement.clientHeight; const popupWidth = popupElement.offsetWidth; const popupHeight = popupElement.offsetHeight; const spritePixelRadius = (SPRITE_SCREEN_SIZE * renderer.domElement.clientHeight) / 2; const gap = 10; let finalLeft = screenX + spritePixelRadius + gap; let finalTop = screenY - popupHeight / 2; if (finalLeft + popupWidth > window.innerWidth - 10) finalLeft = screenX - spritePixelRadius - gap - popupWidth; if (finalTop < 10) finalTop = 10; else if (finalTop + popupHeight > window.innerHeight - 10) finalTop = window.innerHeight - 10 - popupHeight; popupElement.style.left = \`\${Math.round(finalLeft)}px\`; popupElement.style.top = \`\${Math.round(finalTop)}px\`; popupElement.classList.add('visible'); }
-        function hideAnnotationPopup() { if (popupElement) popupElement.classList.remove('visible'); currentPopupAnnotationId = null; }
-        function updatePopupNavButtons() { if (!popupPrevButton || !popupNextButton || currentPopupAnnotationId === null || annotations.length <= 1) { if(popupPrevButton) popupPrevButton.disabled = true; if(popupNextButton) popupNextButton.disabled = true; return; } const sortedAnnotations = [...annotations].sort((a, b) => a.id - b.id); const currentIndex = sortedAnnotations.findIndex(a => a.id === currentPopupAnnotationId); popupPrevButton.disabled = (currentIndex <= 0); popupNextButton.disabled = (currentIndex >= sortedAnnotations.length - 1); }
-        function navigateToPreviousAnnotation() { if (popupPrevButton.disabled || currentPopupAnnotationId === null) return; const sortedAnnotations = [...annotations].sort((a, b) => a.id - b.id); const currentIndex = sortedAnnotations.findIndex(a => a.id === currentPopupAnnotationId); if (currentIndex > 0) { const prevAnnotation = sortedAnnotations[currentIndex - 1]; updatePopupContent(prevAnnotation); animateCameraToView(prevAnnotation.cameraPosition, prevAnnotation.cameraTarget); } }
-        function navigateToNextAnnotation() { if (popupNextButton.disabled || currentPopupAnnotationId === null) return; const sortedAnnotations = [...annotations].sort((a, b) => a.id - b.id); const currentIndex = sortedAnnotations.findIndex(a => a.id === currentPopupAnnotationId); if (currentIndex < sortedAnnotations.length - 1) { const nextAnnotation = sortedAnnotations[currentIndex + 1]; updatePopupContent(nextAnnotation); animateCameraToView(nextAnnotation.cameraPosition, nextAnnotation.cameraTarget); } }
-        function animateCameraToView(targetPosition, targetTarget, duration = 1.2) { if (gsap.isTweening(camera.position) || gsap.isTweening(controls.target)) return; controls.enabled = false; gsap.to(camera.position, { duration: duration, x: targetPosition.x, y: targetPosition.y, z: targetPosition.z, ease: "power3.inOut", onComplete: () => { repositionCurrentPopup(); } }); gsap.to(controls.target, { duration: duration, x: targetTarget.x, y: targetTarget.y, z: targetTarget.z, ease: "power3.inOut", onUpdate: () => controls.update(), onComplete: () => { controls.enabled = true; controls.update(); } }); }
-        function applyEnvMapToModel(model, envMap) { if (!model || !envMap) return; model.traverse(child => { if (child.isMesh && (child.material.isMeshStandardMaterial || child.material.isMeshPhysicalMaterial)) { child.material.envMap = envMap; child.material.envMapIntensity = 1.0; child.material.needsUpdate = true; } }); console.log("Viewer: Applied env map."); }
-        function fitCameraToObject(object, offset = 1.3) { const box = new THREE.Box3().setFromObject(object); const isBoxValid = !box.isEmpty() && Number.isFinite(box.min.x) && Number.isFinite(box.min.y) && Number.isFinite(box.min.z) && Number.isFinite(box.max.x) && Number.isFinite(box.max.y) && Number.isFinite(box.max.z); if (!isBoxValid) { console.warn("Viewer: Invalid BBox."); return false; } const size = box.getSize(new THREE.Vector3()); const center = box.getCenter(new THREE.Vector3()); const maxSize = Math.max(size.x, size.y, size.z); if (maxSize < Number.EPSILON) { console.warn("Viewer: Model size near zero."); camera.position.set(center.x, center.y, center.z + 1); controls.target.copy(center); controls.minDistance = 0.01; controls.maxDistance = 10; controls.update(); return false; } const fitHeightDistance = maxSize / (2 * Math.atan(Math.PI * camera.fov / 360)); const fitWidthDistance = fitHeightDistance / camera.aspect; const distance = offset * Math.max(fitHeightDistance, fitWidthDistance); const direction = controls.target.clone().sub(camera.position).normalize().multiplyScalar(distance); controls.maxDistance = distance * 20; controls.minDistance = Math.max(0.01, distance / 20); controls.target.copy(center); camera.near = Math.max(0.001, distance / 1000); camera.far = distance * 100; camera.updateProjectionMatrix(); camera.position.copy(controls.target).sub(direction); controls.update(); console.log("Viewer: Camera fit."); return true; }
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.11.5/dist/gsap.min.js"></script>
 
-    <\/script>
+  <script>
+    const embeddedString = ${embeddedDataJSONString};
+    const embeddedData = JSON.parse(embeddedString);
+
+    let scene, camera, renderer, controls;
+    let currentModel, mixer, animationActions = [];
+    let annotations = [], annotationSprites = [];
+    let popupEl, nameEl, noteEl, closeBtn;
+    let timelineSlider, playPauseBtn;
+    let clock = new THREE.Clock();
+    let isPlaying = true;
+
+    init();
+
+    function init() {
+      // Scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a1a);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 1, 5);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.outputEncoding = THREE.sRGBEncoding;
+
+      // Controls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 1, 0);
+      controls.update();
+
+      // Light
+      scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(5, 10, 7.5);
+      scene.add(dirLight);
+
+      // UI Elements
+      popupEl = document.getElementById('annotation-popup');
+      nameEl = document.getElementById('popup-name');
+      noteEl = document.getElementById('popup-note');
+      closeBtn = document.getElementById('popup-close');
+      closeBtn.addEventListener('click', () => popupEl.classList.remove('visible'));
+
+      timelineSlider = document.getElementById('timeline-slider');
+      playPauseBtn = document.getElementById('play-pause-btn');
+      playPauseBtn.addEventListener('click', togglePlayPause);
+      timelineSlider.addEventListener('input', () => {
+        const t = parseFloat(timelineSlider.value);
+        animationActions.forEach(a => a.time = t);
+        mixer?.update(0);
+      });
+
+      window.addEventListener('resize', onWindowResize);
+      renderer.domElement.addEventListener('click', onCanvasClick);
+
+      loadModel();
+      animate();
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function loadModel() {
+      const loader = embeddedData.modelFileName.toLowerCase().endsWith('.obj') ? new THREE.OBJLoader() : new THREE.GLTFLoader();
+      loader.load(embeddedData.modelDataUrl, result => {
+        currentModel = result.scene || result;
+        currentModel.traverse(o => { if (o.isMesh) o.layers.set(0); });
+        scene.add(currentModel);
+
+        setupAnnotations();
+        if (embeddedData.timeline?.hasAnimation) setupAnimation(result.animations);
+      });
+    }
+
+    function setupAnimation(animations) {
+      mixer = new THREE.AnimationMixer(currentModel);
+      animationActions = animations.map(a => {
+        const action = mixer.clipAction(a);
+        action.play();
+        return action;
+      });
+
+      document.getElementById('timeline-container').style.display = 'flex';
+      const maxTime = embeddedData.timeline.longestDuration || 1;
+      timelineSlider.max = maxTime;
+      timelineSlider.value = embeddedData.timeline.initialTime || 0;
+      animationActions.forEach(a => a.time = parseFloat(timelineSlider.value));
+    }
+
+    function setupAnnotations() {
+      annotations = embeddedData.annotations || [];
+      annotations.forEach(a => {
+        const sprite = createAnnotationSprite(a);
+        const mesh = currentModel.getObjectByName(a.meshName);
+		if (mesh && Array.isArray(a.localPosition)) {
+			const worldPos = mesh.localToWorld(new THREE.Vector3().fromArray(a.localPosition));
+			sprite.position.copy(worldPos);
+		} else {
+			console.warn("Không tìm thấy mesh hoặc localPosition sai:", a);
+			sprite.position.set(0, 0, 0); // fallback
+		}
+        scene.add(sprite);
+        annotationSprites.push(sprite);
+      });
+    }
+
+    function createAnnotationSprite(a) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'rgba(0, 100, 220, 0.75)';
+      ctx.beginPath(); ctx.arc(32, 32, 28, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(a.id, 32, 35);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(0.07, 0.07, 0.07);
+      sprite.userData = a;
+      return sprite;
+    }
+
+    function onCanvasClick(event) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(annotationSprites, false);
+      if (intersects.length > 0) {
+        const data = intersects[0].object.userData;
+        nameEl.textContent = data.name || '[Không tên]';
+        noteEl.textContent = data.note || '';
+        popupEl.classList.add('visible');
+      } else {
+        popupEl.classList.remove('visible');
+      }
+    }
+
+    function togglePlayPause() {
+      isPlaying = !isPlaying;
+      playPauseBtn.textContent = isPlaying ? '⏸' : '▶️';
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      if (mixer && isPlaying) {
+        mixer.update(delta);
+        const t = animationActions[0]?.time || 0;
+        timelineSlider.value = t;
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    }
+  </script>
 </body>
-</html>`;
-        } // Kết thúc hàm createViewerHTML
+</html>
+`;
+}
+ // Kết thúc hàm createViewerHTML
 		

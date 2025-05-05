@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    #viewer { width: 100%; height: 100%; display: block; }
+    .annotation-label {
+      position: absolute;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 3px 6px;
+      font-size: 11px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+    #annotationNav {
+      position: absolute; bottom: 10px; left: 50%;
+      transform: translateX(-50%); display: flex;
+      gap: 6px; z-index: 10;
+    }
+    #annotationNav button {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: none;
+      background: #ff5e5e;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+      position: relative;
+    }
+    #annotationNav button:hover {
+      background: #fff;
+      color: #000;
+    }
+    #annotationNav button::after {
+      content: attr(data-title);
+      position: absolute;
+      bottom: 110%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      color: #fff;
+      padding: 4px 8px;
+      font-size: 11px;
+      border-radius: 4px;
+      white-space: nowrap;
+      display: none;
+      pointer-events: none;
+    }
+    #annotationNav button:hover::after {
+      display: block;
+    }
+    #annotationPopup {
+      position: absolute;
+      background: rgba(0,0,0,0.9);
+      color: #fff;
+      font-size: 13px;
+      padding: 10px;
+      border-radius: 5px;
+      display: none;
+      max-width: 220px;
+      z-index: 100;
+      pointer-events: none;
+    }
+    #timeline {
+      position: absolute; bottom: 50px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 10; display: flex; align-items: center; gap: 6px;
+    }
+    #timeline input[type="range"] { width: 200px; }
+    #spriteControl {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 8px;
+      border-radius: 5px;
+      z-index: 20;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="viewer"></canvas>
+  <div id="annotationNav"></div>
+  <div id="annotationPopup"></div>
+  <div id="timeline">
+    <button id="playPause">⏸</button>
+    <input id="seek" type="range" min="0" max="1" step="0.001" value="0" />
+  </div>
+  <div id="spriteControl">
+    <label>Scale:
+      <input type="range" id="spriteSize" min="0.01" max="0.2" step="0.01" value="0.05">
+    </label>
+    <br>
+    <label>
+      <input type="checkbox" id="toggleSprite" checked> Ẩn
+    </label>
+  </div>
+
+  <script src="../../js/three/three.min.js"></script>
+  <script src="../../js/three/GLTFLoader.js"></script>
+  <script src="../../js/three/OrbitControls.js"></script>
+  <script src="../../js/three/RGBELoader.js"></script>
+
+  <script>
+    const canvas = document.getElementById('viewer');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(3, 3, 3);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1, 0);
+    controls.update();
+
+    let model = null;
+    let mixer = null;
+    let clock = new THREE.Clock();
+    let annotations = [];
+    const animationTasks = [];
+    let isPlaying = true;
+    const spriteList = [];
+
+    const popup = document.getElementById('annotationPopup');
+    const range = document.getElementById('seek');
+    const playPause = document.getElementById('playPause');
+
+    playPause.onclick = () => {
+      isPlaying = !isPlaying;
+      playPause.textContent = isPlaying ? '⏸' : '▶';
+    };
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
+    scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(10, 10, 10);
+    scene.add(dirLight);
+
+    new THREE.RGBELoader().load(
+  'hdr.hdr',
+  (hdr) => {
+    hdr.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = hdr;
+    scene.background = hdr;
+    loadModel();
+  },
+  undefined,
+  (error) => {
+    console.warn("⚠️ Không tìm thấy hdr.hdr, fallback sang màu nền từ default.json");
+
+    // fallback: đọc backgroundColor từ default.json
+    fetch('default.json')
+      .then(res => res.json())
+      .then(data => {
+        if (data.viewer?.backgroundColor) {
+          scene.background = new THREE.Color(`${data.viewer.backgroundColor}`);
+        } else {
+          scene.background = new THREE.Color('#d7d7d7'); // fallback cuối cùng
+        }
+        scene.environment = null;
+        loadModel();
+      });
+  }
+);
+
+function loadModel() {
+  new THREE.GLTFLoader().load('model.glb', (gltf) => {
+    model = gltf.scene;
+    model.traverse(obj => {
+      if (obj.isMesh && obj.material) {
+        obj.material.envMapIntensity = 1.5;
+        obj.material.needsUpdate = true;
+      }
+    });
+    scene.add(model);
+
+    if (gltf.animations.length > 0) {
+      mixer = new THREE.AnimationMixer(model);
+      gltf.animations.forEach(clip => mixer.clipAction(clip).play());
+    }
+
+    loadAnnotations(); // gọi sau khi model load
+  });
+}
+
+
+    function createAnnotationSprite(annotationData) {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const size = 256;
+      canvas.width = size;
+      canvas.height = size;
+
+      const number = annotationData.id.toString();
+      const radius = size / 2 - 4;
+      context.fillStyle = 'rgba(255, 80, 0, 0.9)';  // Màu cam sáng
+     
+      context.beginPath();
+      context.arc(size / 2, size / 2, radius, 0, Math.PI * 2);
+      context.fill();
+
+      context.strokeStyle = 'white';
+      context.lineWidth = 2;
+      context.stroke();
+
+      context.fillStyle = 'white';
+      context.font = `bold ${size / 2.8}px Arial`;
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText(number, size / 2, size / 2 + 1);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+
+      const spriteMaterial = new THREE.SpriteMaterial({
+        map: texture,
+        sizeAttenuation: false,
+        depthTest: false,
+        transparent: true,
+        opacity: 0.95
+      });
+
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.scale.set(0.05, 0.05, 0.05);
+      return sprite;
+    }
+
+    function loadAnnotations() {
+      fetch('default.json')
+        .then(res => res.json())
+        .then(json => {
+          annotations = json.annotations || [];
+
+          annotations.forEach((ann, idx) => {
+            ann.id = idx + 1;
+            const mesh = model.getObjectByName(ann.meshName);
+            if (!mesh) return;
+
+            const sprite = createAnnotationSprite(ann);
+            const local = new THREE.Vector3(...ann.localPosition);
+            sprite.position.copy(local);
+            mesh.add(sprite);
+            sprite.userData = { ann, idx, mesh, local };
+            spriteList.push(sprite);
+
+            const label = document.createElement('div');
+            label.className = 'annotation-label';
+            label.innerText = `${idx + 1}. ${ann.name || 'Annotation'}`;
+            document.body.appendChild(label);
+
+            const updateLabel = () => {
+              const world = sprite.getWorldPosition(new THREE.Vector3());
+              const screen = world.clone().project(camera);
+              const x = (screen.x * 0.5 + 0.5) * window.innerWidth;
+              const y = (-screen.y * 0.5 + 0.5) * window.innerHeight;
+              label.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+              sprite.lookAt(camera.position);
+            };
+            animationTasks.push(updateLabel);
+
+            sprite.onClick = () => {
+              const world = sprite.getWorldPosition(new THREE.Vector3());
+              const screen = world.clone().project(camera);
+              popup.style.left = `${(screen.x * 0.5 + 0.5) * window.innerWidth}px`;
+              popup.style.top = `${(-screen.y * 0.5 + 0.5) * window.innerHeight}px`;
+              popup.innerHTML = `<b>${idx + 1}. ${ann.name}</b><br/>${ann.note || ''}`;
+              popup.style.display = 'block';
+              setTimeout(() => popup.style.display = 'none', 4000);
+            };
+
+            const btn = document.createElement('button');
+            btn.textContent = `${idx + 1}`;
+            btn.setAttribute('data-title', ann.name || 'Annotation');
+            btn.onclick = () => moveToAnnotation(idx);
+            document.getElementById('annotationNav').appendChild(btn);
+          });
+
+          if (annotations.length > 0) moveToAnnotation(0);
+        });
+    }
+
+    canvas.addEventListener('click', (event) => {
+      const mouse = new THREE.Vector2(
+        (event.clientX / window.innerWidth) * 2 - 1,
+        -(event.clientY / window.innerHeight) * 2 + 1
+      );
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
+      intersects.forEach(obj => obj.object.onClick?.());
+    });
+
+    function moveToAnnotation(index) {
+      const ann = annotations[index];
+      const mesh = model.getObjectByName(ann.meshName);
+      if (!mesh) return;
+      const world = mesh.localToWorld(new THREE.Vector3(...ann.localPosition));
+
+      if (ann.cameraPosition && ann.cameraTarget) {
+        camera.position.set(...Object.values(ann.cameraPosition));
+        controls.target.set(...Object.values(ann.cameraTarget));
+      } else {
+        camera.position.copy(world.clone().add(new THREE.Vector3(1, 1, 1)));
+        controls.target.copy(world);
+      }
+      controls.update();
+
+      if (ann.animationTime && mixer) {
+        mixer.setTime(ann.animationTime);
+        range.value = ann.animationTime / mixer._actions[0]._clip.duration;
+      }
+    }
+
+    range.addEventListener('input', (e) => {
+      if (mixer && mixer._actions.length > 0) {
+        const clip = mixer._actions[0]._clip;
+        mixer.setTime(clip.duration * parseFloat(e.target.value));
+      }
+    });
+
+    document.getElementById('spriteSize').addEventListener('input', e => {
+      const size = parseFloat(e.target.value);
+      spriteList.forEach(s => s.scale.set(size, size, size));
+    });
+
+    document.getElementById('toggleSprite').addEventListener('change', e => {
+      const visible = e.target.checked;
+      spriteList.forEach(s => s.visible = visible);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (mixer && isPlaying) {
+        const delta = clock.getDelta();
+        mixer.update(delta);
+        const clip = mixer._actions[0]?._clip;
+        if (clip) {
+          range.value = mixer.time / clip.duration;
+        }
+      }
+      animationTasks.forEach(fn => fn());
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
